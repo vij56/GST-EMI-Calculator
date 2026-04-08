@@ -1,0 +1,52 @@
+{
+  "expo": {
+    "name": "gst-emi-calculator",
+    "slug": "gst-emi-calculator",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.endmin.gstemicalculator",
+      "versionCode": 11,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "edgeToEdgeEnabled": true,
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      [
+        "react-native-google-mobile-ads",
+        {
+          "androidAppId": "${ADMOB_ANDROID_APP_ID}",
+          "iosAppId": "${ADMOB_IOS_APP_ID}"
+        }
+      ]
+    ],
+    "extra": {
+      "admobBannerUnitIdAndroid": "${ADMOB_BANNER_UNIT_ID_ANDROID}",
+      "admobInterstitialUnitIdAndroid": "${ADMOB_INTERSTITIAL_UNIT_ID_ANDROID}",
+      "revenueCatApiKeyAndroid": "${REVENUECAT_API_KEY}",
+      "revenueCatEntitlementId": "${REVENUECAT_ENTITLEMENT_ID}",
+      "androidAppId": "${ADMOB_ANDROID_APP_ID}",
+      "iosAppId": "${ADMOB_IOS_APP_ID}",
+      "eas": {
+        "projectId": "${EAS_PROJECT_ID}"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
