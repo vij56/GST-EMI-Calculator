@@ -1,1559 +1,704 @@
-// --- Native/Expo API stubs for web/compile ---
-const Linking = {
-  async canOpenURL(_url: string) {
-    return false;
-  },
-  async openURL(_url: string) {},
-};
-const Sharing = {
-  async isAvailableAsync() {
-    return false;
-  },
-  async shareAsync(_uri: string, _options?: any) {},
-};
-const Print = {
-  async printAsync(_options: any) {},
-  async printToFileAsync(_options: any) {
-    return { uri: "" };
-  },
-};
-const AsyncStorage = {
-  async setItem(key: string, value: string) {},
-  async getItem(key: string) {
-    return null;
-  },
-  async removeItem(key: string) {},
-};
+import React, { useState, useRef, useEffect } from "react";
+import { View, Text, TextInput, Pressable, Animated, Easing, StyleSheet, Dimensions, ScrollView, Platform } from "react-native";
 
-// --- UI/Native stubs for Expo/React Native ---
-const LinearGradient = ({ children, ...props }: any) => (
-  <View {...props}>{children}</View>
-);
-const KeyboardAvoidingView = ({ children, ...props }: any) => (
-  <View {...props}>{children}</View>
-);
-const ScrollView = ({ children, ...props }: any) => (
-  <View {...props}>{children}</View>
-);
 
-function formatINR(n: number | undefined): string {
-  if (typeof n !== "number" || isNaN(n)) return "-";
-  return n.toLocaleString("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 2,
-  });
-}
-if (typeof AsyncStorage !== "undefined") {
-  (AsyncStorage as any).removeItem = async function (key: string) {};
-}
-// --- MISSING CONSTANTS, TYPES, HELPERS (STUBS) ---
-import React, { useRef, ReactNode, useState, useEffect, useMemo } from "react";
-import {
-  StyleSheet,
-  Pressable,
-  View,
-  Text,
-  TextInput,
-  Platform,
-  StyleProp,
-  Alert,
-} from "react-native";
-import { StatusBar } from 'expo-status-bar';
+const { width, height } = Dimensions.get("window");
 
-// --- APP CONFIG STUB (from app.json extra) ---
-const extraConfig = {
-  revenueCatEntitlementId: "pro_access", // Replace with your actual entitlement ID if needed
-};
+const GST_RATES = [3, 5, 12, 18, 28];
 
-// --- MISSING ENUMS, TYPES, CONSTANTS, HELPERS ---
-// Modes
-type Mode = "GST" | "EMI" | "COMPARE" | "TAX";
-type ThemeMode = "LIGHT" | "DARK";
-type GstMode = "EXCLUSIVE" | "INCLUSIVE";
-type TenureUnit = "YEARS" | "MONTHS";
-type PropertyStatus = "SELF_OCCUPIED" | "LET_OUT";
-
-// GST Result
-type GstResult = {
-  valid: boolean;
-  taxableValue?: number;
-  taxAmount?: number;
-  totalAmount?: number;
-  error?: string;
-  // legacy fields for compatibility
-  baseAmount?: number;
-  gstAmount?: number;
-  cgst?: number;
-  sgst?: number;
-  igst?: number;
-};
-
-// EMI Schedule Row
-type ScheduleRow = {
-  month: number;
-  emiPaid: number;
-  principalPart: number;
-  interestPart: number;
-  prepaymentPart: number;
-  balance: number;
-};
-
-// EMI Result
-type EmiResult = {
-  valid: boolean;
-  months?: number;
-  emi?: number;
-  totalInterest?: number;
-  totalPayment?: number;
-  feeAmount?: number;
-  totalOutflow?: number;
-  previewRows?: any[];
-  scheduleRows?: any[];
-  prepaymentSummary?: {
-    applied: boolean;
-    prepaymentAmount?: number;
-    prepaymentMonth?: number;
-    monthsAfterPrepayment?: number;
-    interestAfterPrepayment?: number;
-    tenureSavedMonths?: number;
-    interestSaved?: number;
-  };
-  error?: string;
-};
-
-// Compare Result
-type CompareResult = {
-  base: EmiResult;
-  compare: EmiResult;
-  diff: number;
-};
-
-// Affordability Result
-type AffordabilityResult = {
-  disposableIncome: number;
-  safeEmi: number;
-  recommendedLoanAmount: number;
-  maxByIncomeRule: number;
-};
-
-// Tax Result
-type TaxResult = {
-  principalDeduction: number;
-  interestDeduction: number;
-  totalDeduction: number;
-  taxSavings: number;
-  monthlyTaxBenefit: number;
-  hraDeduction: number;
-  section80CLimit: number;
-  section24Limit: number;
-};
-
-// ThemePalette stub (expand as needed)
-type ThemePalette = {
-  gradient: string[];
-  statusBar: string;
-  orbA: string;
-  orbB: string;
-  planCardBorder: string;
-  planCardBg: string;
-  panelGlow: string;
-  exportButton: string;
-  exportButtonGlow: string;
-  panelBorder: string;
-  panel: string;
-  pageText: string;
-  highlight: string;
-  mutedText: string;
-  subtitleText: string;
-  segmentBg: string;
-  activePill: string;
-  activePillText: string;
-  inputBorder: string;
-  inputText: string;
-  inputBg: string;
-  resultsBorder: string;
-  resultsBg: string;
-  divider: string;
-  error: string;
-  resetBorder: string;
-  resetBg: string;
-  adBannerBorder: string;
-  adBannerBg: string;
-  segmentActive: string;
-  segmentText: string;
-  segmentActiveText: string;
-  placeholder: string;
-};
-
-// Utility: toNumber
-function toNumber(val: any): number {
-  const n = Number(val);
-  return isNaN(n) ? 0 : n;
+function amountInWords(num) {
+  // Simple number to words for demo (Indian system)
+  // For brevity, only handles up to 99999
+  const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  if (num === 0) return "Zero";
+  if (num > 99999) return "Amount too large";
+  let words = "";
+  if (Math.floor(num / 1000) > 0) {
+    words += ones[Math.floor(num / 1000)] + " Thousand ";
+    num %= 1000;
+  }
+  if (Math.floor(num / 100) > 0) {
+    words += ones[Math.floor(num / 100)] + " Hundred ";
+    num %= 100;
+  }
+  if (num > 0) {
+    if (num < 20) words += ones[num];
+    else {
+      words += tens[Math.floor(num / 10)];
+      if (num % 10 > 0) words += " " + ones[num % 10];
+    }
+  }
+  return words.trim() + " Rupees Only";
 }
 
-// Utility: calculateSchedule (stub)
-function calculateSchedule(
-  principal: number,
-  monthlyRate: number,
-  emi: number,
-  lumpSumMonth: number,
-  lumpSumAmount: number,
-): ScheduleRow[] {
-  // Simple stub: returns empty schedule
-  return [];
-}
-
-// Utility: buildScheduleCsv (stub)
-function buildScheduleCsv(rows: ScheduleRow[]): string {
-  return (
-    "Month,EMI Paid,Principal,Interest,Prepayment,Balance\n" +
-    rows
-      .map(
-        (r) =>
-          `${r.month},${r.emiPaid},${r.principalPart},${r.interestPart},${r.prepaymentPart},${r.balance}`,
-      )
-      .join("\n")
-  );
-}
-
-// Add summary properties to ScheduleRow[] arrays for compatibility
-// @ts-ignore
-Object.defineProperties(Array.prototype, {
-  months: {
-    get() {
-      return this.length;
-    },
-    configurable: true,
-  },
-  totalInterest: {
-    get() {
-      return this.reduce((sum: number, row: any) => sum + (row.interestPart || 0), 0);
-    },
-    configurable: true,
-  },
-  totalEmiPaid: {
-    get() {
-      return this.reduce((sum: number, row: any) => sum + (row.emiPaid || 0), 0);
-    },
-    configurable: true,
-  },
-  totalPrepayment: {
-    get() {
-      return this.reduce((sum: number, row: any) => sum + (row.prepaymentPart || 0), 0);
-    },
-    configurable: true,
-  },
-  rows: {
-    get() {
-      return this;
-    },
-    configurable: true,
-  },
+// Shared button styles for consistency
+const buttonBase = (isActive, isDark) => ({
+  flex: 1,
+  backgroundColor: isActive ? "#38bdf8" : isDark ? "#1e293b" : "#e0e7ef",
+  borderRadius: 8,
+  paddingVertical: 10,
+  alignItems: "center"
 });
-
-// Utility: glowStyle (stub)
-function glowStyle(
-  color: string,
-  opacity: number,
-  blur: number,
-  spread: number,
-) {
-  return {};
-}
-
-// Constants
-const FREE_EXPORT_LIMIT_PER_DAY = 2;
-const FREE_EXPORT_ROW_LIMIT = 12;
-
-// Move interactiveStyles above AnimatedPressable to ensure it is always defined
-// Only define interactiveStyles once, above all usages
-const interactiveStyles = StyleSheet.create({
-  pressableFill: {
-    alignSelf: "stretch",
-    position: "relative",
-    overflow: "hidden",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pressableGlow: {
-    ...StyleSheet.absoluteFillObject,
-    borderRadius: 999,
-  },
+const buttonText = (isActive, isDark) => ({
+  color: isActive ? "#111" : isDark ? "#fff" : "#111",
+  fontWeight: "bold"
 });
-
-type AnimatedPressableProps = {
-  children: ReactNode;
-  onPress: () => void;
-  style?: StyleProp<any>;
-  glowColor?: string;
+const resetButton = isDark => ({
+  backgroundColor: isDark ? "#0ea5e9" : "#38bdf8",
+  borderRadius: 8,
+  paddingVertical: 12,
+  alignItems: "center",
+  marginTop: 8
+});
+const resetButtonText = {
+  color: "#fff",
+  fontWeight: "bold"
+};
+const exportButton = {
+  flex: 1,
+  backgroundColor: "#38bdf8",
+  borderRadius: 8,
+  paddingVertical: 10,
+  alignItems: "center"
+};
+const exportButtonText = {
+  color: "#fff",
+  fontWeight: "bold"
 };
 
-function AnimatedPressable({
-  children,
-  onPress,
-  style,
-  glowColor = "#38bdf8",
-}: AnimatedPressableProps) {
-  const pressScale = useRef(new Animated.Value(1)).current;
-  const glowLevel = useRef(new Animated.Value(0)).current;
-
-  const handlePressIn = () => {
-    Animated.parallel([
-      Animated.spring(pressScale, {
-        toValue: 0.96,
-        useNativeDriver: true,
-        speed: 32,
-        bounciness: 6,
-      }),
-      Animated.timing(glowLevel, {
-        toValue: 1,
-        duration: 170,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.parallel([
-      Animated.spring(pressScale, {
-        toValue: 1,
-        useNativeDriver: true,
-        speed: 24,
-        bounciness: 9,
-      }),
-      Animated.timing(glowLevel, {
-        toValue: 0,
-        duration: 220,
-        easing: Easing.out(Easing.quad),
-        useNativeDriver: false,
-      }),
-    ]).start();
-  };
-
-  return (
-    <Animated.View
-      style={[
-        style,
-        {
-          transform: [{ scale: pressScale }],
-        },
-      ]}
-    >
-      <Pressable
-        onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        style={interactiveStyles.pressableFill}
-      >
-        <Animated.View
-          pointerEvents="none"
-          style={[
-            interactiveStyles.pressableGlow,
-            {
-              backgroundColor: glowColor,
-              opacity: glowLevel.interpolate({
-                inputRange: [0, 1],
-                outputRange: [0, 0.22],
-              }),
-              transform: [
-                {
-                  scale: glowLevel.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.96, 1.06],
-                  }),
-                },
-              ],
-            },
-          ]}
-        />
-        {children}
-      </Pressable>
-    </Animated.View>
-  );
-}
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-
-// Animated/Easing stubs for react-native-reanimated
-type AnimatedCallback = (value: { value: number }) => void;
-class AnimatedValueStub {
-  private _value: number;
-  constructor(v: number) {
-    this._value = v;
-  }
-  setValue(v: number) {
-    this._value = v;
-  }
-  addListener(cb?: AnimatedCallback) {
-    if (cb) cb({ value: this._value });
-    return 0;
-  }
-  removeListener(_id?: number) {}
-  interpolate(..._args: any[]) {
-    return this;
-  }
-}
-const Animated = {
-  Value: AnimatedValueStub,
-  timing: (_val: any, _config: any) => ({
-    start: (cb?: () => void) => {
-      if (cb) cb();
-    },
-  }),
-  spring: (_val: any, _config: any) => ({
-    start: (cb?: () => void) => {
-      if (cb) cb();
-    },
-  }),
-  parallel: (anims: any[]) => ({
-    start: (cb?: () => void) => {
-      if (cb) cb();
-    },
-  }),
-  loop: (a: any) => ({ start: () => {}, stop: () => {} }),
-  sequence: (..._args: any[]) => ({}),
-  View: (props: any) => null,
+// Strictly uniform button styles for all major action buttons
+const uniformButton = (isActive, isDark) => ({
+  flex: 1,
+  backgroundColor: isActive ? "#38bdf8" : isDark ? "#1e293b" : "#e0e7ef",
+  borderRadius: 8,
+  paddingVertical: 12,
+  alignItems: "center",
+  marginHorizontal: 2
+});
+const uniformButtonText = (isActive, isDark) => ({
+  color: isActive ? "#111" : isDark ? "#fff" : "#111",
+  fontWeight: "bold",
+  fontSize: 16
+});
+const uniformButtonSolid = {
+  flex: 1,
+  backgroundColor: "#38bdf8",
+  borderRadius: 8,
+  paddingVertical: 12,
+  alignItems: "center",
+  marginHorizontal: 2
 };
-const Easing = {
-  out: (fn: any) => fn,
-  inOut: (fn: any) => fn,
-  cubic: () => (t: number) => t,
-  quad: () => (t: number) => t,
+const uniformButtonSolidText = {
+  color: "#fff",
+  fontWeight: "bold",
+  fontSize: 16
 };
 
-// Safe message stub
-const safeMessage = (msg: string) => {};
 
-// Helper function moved above App
-const buildScheduleHtml = (
-  rows: ScheduleRow[],
-  emi: number,
-  totalInterest: number,
-  totalOutflow: number,
-) => {
-  const tableRows = rows
-    .slice(0, 180)
-    .map(
-      (row) => `
-      <tr>
-        <td>${row.month}</td>
-        <td>${row.emiPaid.toFixed(2)}</td>
-        <td>${row.principalPart.toFixed(2)}</td>
-        <td>${row.interestPart.toFixed(2)}</td>
-        <td>${row.prepaymentPart.toFixed(2)}</td>
-        <td>${row.balance.toFixed(2)}</td>
-      </tr>`,
-    )
-    .join("");
-
-  return `
-  <html>
-    <head>
-      <style>
-        body { font-family: Arial, sans-serif; padding: 20px; color: #0f172a; }
-        h1 { margin-bottom: 4px; }
-        .meta { margin-bottom: 18px; color: #334155; }
-        table { width: 100%; border-collapse: collapse; font-size: 11px; }
-        th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: right; }
-        th:first-child, td:first-child { text-align: center; }
-        th { background: #e2e8f0; }
-      </style>
-    </head>
-    <body>
-      <h1>EMI Schedule</h1>
-      <div class="meta">EMI: ${emi.toFixed(2)} | Total Interest: ${totalInterest.toFixed(
-        2,
-      )} | Total Outflow: ${totalOutflow.toFixed(2)}</div>
-      <table>
-        <thead>
-          <tr>
-            <th>Month</th>
-            <th>EMI Paid</th>
-            <th>Principal</th>
-            <th>Interest</th>
-            <th>Prepayment</th>
-            <th>Balance</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
-    </body>
-  </html>`;
-};
 
 export default function App() {
-  // --- STATE HOOKS ---
-  const [mode, setMode] = useState<Mode>("GST");
-  const [themeMode, setThemeMode] = useState<ThemeMode>("LIGHT");
-  const [amount, setAmount] = useState<string>("1000");
-  const [gstRate, setGstRate] = useState<string>("18");
-  const [gstMode, setGstMode] = useState<GstMode>("EXCLUSIVE");
-  const [splitTax, setSplitTax] = useState<boolean>(true);
-  const [principal, setPrincipal] = useState<string>("500000");
-  const [annualRate, setAnnualRate] = useState<string>("10.5");
-  const [tenureValue, setTenureValue] = useState<string>("5");
-  const [tenureUnit, setTenureUnit] = useState<TenureUnit>("YEARS");
-  const [processingFee, setProcessingFee] = useState<string>("1");
-  const [prepaymentMonth, setPrepaymentMonth] = useState<string>("12");
-  const [prepaymentAmount, setPrepaymentAmount] = useState<string>("100000");
-  const [compareEnabled, setCompareEnabled] = useState<boolean>(false);
-  const [compareAnnualRate, setCompareAnnualRate] = useState<string>("9.25");
-  const [compareTenureValue, setCompareTenureValue] = useState<string>("5");
-  const [compareTenureUnit, setCompareTenureUnit] =
-    useState<TenureUnit>("YEARS");
-  const [compareProcessingFee, setCompareProcessingFee] =
-    useState<string>("0.5");
-  const [monthlyIncome, setMonthlyIncome] = useState<string>("80000");
-  const [monthlyExpenses, setMonthlyExpenses] = useState<string>("35000");
-  const [existingEmis, setExistingEmis] = useState<string>("5000");
-  const [exportMessage, setExportMessage] = useState<string>("");
-  const [homeloanPrincipal, setHomeloanPrincipal] = useState<string>("2000000");
-  const [annualPrincipalRepayment, setAnnualPrincipalRepayment] =
-    useState<string>("100000");
-  const [annualInterestPaid, setAnnualInterestPaid] =
-    useState<string>("200000");
-  const [annualIncome, setAnnualIncome] = useState<string>("960000");
-  const [taxRate, setTaxRate] = useState<string>("30");
-  const [propertyStatus, setPropertyStatus] =
-    useState<PropertyStatus>("SELF_OCCUPIED");
-  const [annualHRA, setAnnualHRA] = useState<string>("600000");
-  const [isPro, setIsPro] = useState<boolean>(false);
-  const [billingReady, setBillingReady] = useState<boolean>(false);
-  const [purchasesSdk, setPurchasesSdk] = useState<any>(null);
-  const [offerings, setOfferings] = useState<any>(null);
-  const [rcEntitlement] = useState<string>(extraConfig.revenueCatEntitlementId);
-  const [dailyExportKey, setDailyExportKey] = useState<string>("");
-  const [dailyExportCount, setDailyExportCount] = useState<number>(0);
-  const [safeScheduleRows, setSafeScheduleRows] = useState<any[]>([]);
-  // --- PLACEHOLDER DEFINITIONS FOR MISSING VARIABLES ---
-  const theme: ThemePalette = {
-    gradient: ["#fff", "#eee"],
-    statusBar: "dark",
-    orbA: "#fff",
-    orbB: "#fff",
-    planCardBorder: "#eee",
-    planCardBg: "#fff",
-    panelGlow: "#fff",
-    exportButton: "#fff",
-    exportButtonGlow: "#fff",
-    panelBorder: "#eee",
-    panel: "#fff",
-    pageText: "#222",
-    highlight: "#38bdf8",
-    mutedText: "#888",
-    subtitleText: "#aaa",
-    segmentBg: "#f5f5f5",
-    activePill: "#e0f7fa",
-    activePillText: "#00796b",
-    inputBorder: "#ccc",
-    inputText: "#222",
-    inputBg: "#fff",
-    resultsBorder: "#eee",
-    resultsBg: "#fafafa",
-    divider: "#eee",
-    error: "#e53935",
-    resetBorder: "#eee",
-    resetBg: "#fff",
-    adBannerBorder: "#eee",
-    adBannerBg: "#fff",
-    segmentActive: "#e0f7fa",
-    segmentText: "#222",
-    segmentActiveText: "#00796b",
-    placeholder: "#888",
-  };
-  // Move createStyles definition above this line
-  // Completely disable all style-related functionality
-  const createStyles = (_theme: ThemePalette) => new Proxy({}, {
-    get: () => undefined,
-  });
-  // Define styles after theme is defined
-  const styles = createStyles(theme);
-  const headerOpacity = 1;
-  const headerTranslateY = 0;
-  const cardOpacity = 1;
-  const cardTranslateY = 0;
-  const glowOpacity = 1;
-  const BannerAd = null;
-  const BannerAdSize = { ANCHORED_ADAPTIVE_BANNER: "BANNER" };
-  const adBannerUnitId = "test";
-  const TestIds = { BANNER: "test" };
+  // Animated background
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 4000, easing: Easing.inOut(Easing.cubic), useNativeDriver: false }),
+        Animated.timing(anim, { toValue: 0, duration: 4000, easing: Easing.inOut(Easing.cubic), useNativeDriver: false })
+      ])
+    ).start();
+  }, []);
+  const bgTranslate = anim.interpolate({ inputRange: [0, 1], outputRange: [-height * 0.2, height * 0.2] });
 
-    // --- FIXED JSX STRUCTURE ---
-    // --- END STATE HOOKS ---
-    // Segment is defined below
+  // Theme
+  const [theme, setTheme] = useState("dark");
+  const isDark = theme === "dark";
 
-    // --- MOVE createStyles DEFINITION HERE FROM BELOW ---
-      // Removed duplicate createStyles definition (already defined above)
+  // Tabs
+  const [tab, setTab] = useState("GST");
 
-    // --- END MOVED createStyles DEFINITION ---
-  const gstResult = useMemo<GstResult>(() => {
-    const baseAmount = toNumber(amount);
-    const rate = toNumber(gstRate);
+  // GST Calculator state
+  const [amount, setAmount] = useState("");
+  const [gstRate, setGstRate] = useState("");
+  const [gstType, setGstType] = useState("add"); // add or incl
+  const [splitType, setSplitType] = useState("none"); // none, igst, or cgst
 
-    if (baseAmount <= 0 || rate < 0) {
-      return {
-        valid: false,
-        error: "Enter a valid amount and GST rate.",
-      };
-    }
+  // Export count (mocked)
+  const [exportsLeft, setExportsLeft] = useState(2);
 
-    const rateFraction = rate / 100;
+  // Calculations
+  const amt = parseFloat(amount) || 0;
+  let taxable = gstType === "add" ? amt : amt / (1 + gstRate / 100);
+  let gstAmt = taxable * (gstRate / 100);
+  let igst = splitType === "igst" ? gstAmt : splitType === "cgst" ? gstAmt / 2 : 0;
+  let cgst = splitType === "cgst" ? gstAmt / 2 : 0;
+  let sgst = splitType === "cgst" ? gstAmt / 2 : 0;
+  let finalAmt = gstType === "add" ? taxable + gstAmt : amt;
 
-    if (gstMode === "EXCLUSIVE") {
-      const taxAmount = baseAmount * rateFraction;
-      const totalAmount = baseAmount + taxAmount;
-      return {
-        valid: true,
-        taxableValue: baseAmount,
-        taxAmount,
-        totalAmount,
-      };
-    }
+  // Reset
+  function resetGST() {
+    setAmount("");
+    setGstRate(28);
+    setGstType("add");
+    setSplitType("igst");
+  }
 
-    const taxableValue = baseAmount / (1 + rateFraction);
-    const taxAmount = baseAmount - taxableValue;
-    return {
-      valid: true,
-      taxableValue,
-      taxAmount,
-      totalAmount: baseAmount,
-    };
-  }, [amount, gstRate, gstMode]);
 
-  const emiResult = useMemo<EmiResult>(() => {
-    const loan = toNumber(principal);
-    const annualInterest = toNumber(annualRate);
-    const tenure = toNumber(tenureValue);
-    const feeRate = toNumber(processingFee);
-    const lumpSumMonth = Math.round(toNumber(prepaymentMonth));
-    const lumpSumAmount = toNumber(prepaymentAmount);
-    const months =
-      tenureUnit === "YEARS" ? Math.round(tenure * 12) : Math.round(tenure);
-
-    if (loan <= 0 || annualInterest < 0 || months <= 0 || feeRate < 0) {
-      return {
-        valid: false,
-        error: "Enter valid loan values to calculate EMI.",
-      };
-    }
-
-    const monthlyRate = annualInterest / 1200;
-    const emi =
-      monthlyRate === 0
-        ? loan / months
-        : (loan * monthlyRate * Math.pow(1 + monthlyRate, months)) /
-          (Math.pow(1 + monthlyRate, months) - 1);
-
-    const baselineSchedule = calculateSchedule(loan, monthlyRate, emi, 0, 0);
-    const withPrepayment =
-      lumpSumAmount > 0 && lumpSumMonth > 0
-        ? calculateSchedule(loan, monthlyRate, emi, lumpSumMonth, lumpSumAmount)
-        : baselineSchedule;
-
-    const totalPayment = baselineSchedule.totalEmiPaid;
-    const totalInterest = baselineSchedule.totalInterest;
-    const feeAmount = (loan * feeRate) / 100;
-    const totalOutflow = totalPayment + feeAmount;
-
-    const previewRows = withPrepayment.rows.slice(0, 6).map((row: any) => ({
-      month: row.month,
-      principalPart: row.principalPart,
-      interestPart: row.interestPart,
-      balance: row.balance,
-    }));
-
-    return {
-      valid: true,
-      months: baselineSchedule.months,
-      emi,
-      totalInterest,
-      totalPayment,
-      feeAmount,
-      totalOutflow,
-      previewRows,
-      scheduleRows: withPrepayment.rows,
-      prepaymentSummary: {
-        applied: lumpSumAmount > 0 && lumpSumMonth > 0,
-        prepaymentAmount: withPrepayment.totalPrepayment,
-        prepaymentMonth: lumpSumMonth,
-        monthsAfterPrepayment: withPrepayment.months,
-        interestAfterPrepayment: withPrepayment.totalInterest,
-        tenureSavedMonths: Math.max(
-          0,
-          baselineSchedule.months - withPrepayment.months,
-        ),
-        interestSaved: Math.max(
-          0,
-          baselineSchedule.totalInterest - withPrepayment.totalInterest,
-        ),
-      },
-    };
-  }, [
-    principal,
-    annualRate,
-    tenureValue,
-    tenureUnit,
-    processingFee,
-    prepaymentAmount,
-    prepaymentMonth,
-  ]);
-
-  const compareResult = useMemo<CompareResult | null>(() => {
-    if (!compareEnabled || !emiResult.valid) {
-      return null;
-    }
-
-    const loan = toNumber(principal);
-    const annualInterest = toNumber(compareAnnualRate);
-    const tenure = toNumber(compareTenureValue);
-    const feeRate = toNumber(compareProcessingFee);
-    const months =
-      compareTenureUnit === "YEARS"
-        ? Math.round(tenure * 12)
-        : Math.round(tenure);
-
-    if (loan <= 0 || annualInterest < 0 || months <= 0 || feeRate < 0) {
-      return null;
-    }
-
-    const monthlyRate = annualInterest / 1200;
-    const emi =
-      monthlyRate === 0
-        ? loan / months
-        : (loan * monthlyRate * Math.pow(1 + monthlyRate, months)) /
-          (Math.pow(1 + monthlyRate, months) - 1);
-
-    const schedule = calculateSchedule(loan, monthlyRate, emi, 0, 0);
-    const totalPayment = schedule.totalEmiPaid;
-    const totalInterest = schedule.totalInterest;
-    const feeAmount = (loan * feeRate) / 100;
-    const totalOutflow = totalPayment + feeAmount;
-
-    return {
-      months: schedule.months,
-      emi,
-      totalInterest,
-      totalPayment,
-      feeAmount,
-      totalOutflow,
-    };
-  }, [
-    compareEnabled,
-    emiResult,
-    principal,
-    compareAnnualRate,
-    compareTenureValue,
-    compareTenureUnit,
-    compareProcessingFee,
-  ]);
-
-  const affordabilityResult = useMemo<AffordabilityResult | null>(() => {
-    const income = toNumber(monthlyIncome);
-    const expenses = toNumber(monthlyExpenses);
-    const existing = toNumber(existingEmis);
-    const annualInterest = toNumber(annualRate);
-    const tenure = toNumber(tenureValue);
-    const months =
-      tenureUnit === "YEARS" ? Math.round(tenure * 12) : Math.round(tenure);
-
-    if (
-      income <= 0 ||
-      expenses < 0 ||
-      existing < 0 ||
-      annualInterest < 0 ||
-      months <= 0
-    ) {
-      return null;
-    }
-
-    const disposableIncome = Math.max(0, income - expenses - existing);
-    const maxByIncomeRule = Math.max(0, income * 0.4 - existing);
-    const safeEmi = Math.max(0, Math.min(disposableIncome, maxByIncomeRule));
-
-    const monthlyRate = annualInterest / 1200;
-    const recommendedLoanAmount =
-      monthlyRate === 0
-        ? safeEmi * months
-        : (safeEmi * (Math.pow(1 + monthlyRate, months) - 1)) /
-          (monthlyRate * Math.pow(1 + monthlyRate, months));
-
-    return {
-      disposableIncome,
-      safeEmi,
-      recommendedLoanAmount: Math.max(0, recommendedLoanAmount),
-      maxByIncomeRule,
-    };
-  }, [
-    monthlyIncome,
-    monthlyExpenses,
-    existingEmis,
-    annualRate,
-    tenureValue,
-    tenureUnit,
-  ]);
-
-  const taxResult = useMemo<TaxResult | null>(() => {
-    const principal = toNumber(homeloanPrincipal);
-    const annualPrincipalRep = toNumber(annualPrincipalRepayment);
-    const annualInterest = toNumber(annualInterestPaid);
-    const income = toNumber(annualIncome);
-    const tax = toNumber(taxRate);
-    const hra = toNumber(annualHRA);
-
-    if (
-      principal <= 0 ||
-      annualPrincipalRep < 0 ||
-      annualInterest < 0 ||
-      income <= 0 ||
-      tax <= 0
-    ) {
-      return null;
-    }
-
-    // Section 80C: Principal repayment limited to 1.5 lakhs per year
-    const maxSection80C = 150000;
-    const principalDeduction = Math.min(annualPrincipalRep, maxSection80C);
-
-    // Section 24: Interest deduction
-    // Self-occupied: limited to 2 lakhs per year
-    // Let-out: no limit
-    const maxSection24 = propertyStatus === "SELF_OCCUPIED" ? 200000 : Infinity;
-    const interestDeduction = Math.min(annualInterest, maxSection24);
-
-    // Total deduction = Section 80C + Section 24
-    const totalDeduction = principalDeduction + interestDeduction;
-
-    // Tax savings = Total deduction × Tax rate %
-    const taxSavings = (totalDeduction * tax) / 100;
-    const monthlyTaxBenefit = taxSavings / 12;
-
-    // HRA deduction (not claimed if own home)
-    const hraDeduction = 0; // Since they have home loan, HRA typically not claimed
-
-    return {
-      principalDeduction,
-      interestDeduction,
-      totalDeduction,
-      taxSavings,
-      monthlyTaxBenefit: Math.max(0, monthlyTaxBenefit),
-      hraDeduction,
-      section80CLimit: maxSection80C,
-      section24Limit: propertyStatus === "SELF_OCCUPIED" ? 200000 : 0,
-    };
-  }, [
-    homeloanPrincipal,
-    annualPrincipalRepayment,
-    annualInterestPaid,
-    annualIncome,
-    taxRate,
-    propertyStatus,
-    annualHRA,
-  ]);
-
-  const resetGst = () => {
-    setAmount("1000");
-    setGstRate("18");
-    setGstMode("EXCLUSIVE");
-    setSplitTax(true);
-  };
-
-  const resetEmi = () => {
-    setPrincipal("500000");
-    setAnnualRate("10.5");
-    setTenureValue("5");
-    setTenureUnit("YEARS");
-    setProcessingFee("1");
-    setPrepaymentMonth("12");
-    setPrepaymentAmount("100000");
-    setCompareEnabled(false);
-    setCompareAnnualRate("9.25");
-    setCompareTenureValue("5");
-    setCompareTenureUnit("YEARS");
-    setCompareProcessingFee("0.5");
-    setMonthlyIncome("80000");
-    setMonthlyExpenses("35000");
-    setExistingEmis("5000");
-    setExportMessage("");
-  };
-
-  const resetTax = () => {
-    setHomeloanPrincipal("2000000");
-    setAnnualPrincipalRepayment("100000");
-    setAnnualInterestPaid("200000");
-    setAnnualIncome("960000");
-    setTaxRate("30");
-    setPropertyStatus("SELF_OCCUPIED");
-    setAnnualHRA("600000");
-    setExportMessage("");
-  };
-
-  const syncDailyLimitWindow = () => {
-    const today = new Date().toDateString();
-    if (today !== dailyExportKey) {
-      setDailyExportKey(today);
-      setDailyExportCount(0);
-      AsyncStorage.setItem(`exportCount_${today}`, "0");
-      return 0;
-    }
-    return dailyExportCount;
-  };
-
-  // Removed showInterstitialIfReady (interstitial ad logic)
-
-  const registerExportUsage = async () => {
-    if (!isPro) {
-      const newCount = dailyExportCount + 1;
-      setDailyExportCount(newCount);
-      const today = new Date().toDateString();
-      await AsyncStorage.setItem(`exportCount_${today}`, newCount.toString());
-    }
-  };
-
-  const ensureCanExport = () => {
-    if (isPro) {
-      return true;
-    }
-
-    const currentCount = syncDailyLimitWindow();
-    if (currentCount >= FREE_EXPORT_LIMIT_PER_DAY) {
-      Alert.alert(
-        "Free limit reached",
-        `Free plan allows ${FREE_EXPORT_LIMIT_PER_DAY} exports/day. Upgrade to Pro for unlimited full exports.`,
-      );
-      return false;
-    }
-
-    return true;
-  };
-
-  const launchUpgrade = async () => {
-    if (
-      billingReady &&
-      purchasesSdk &&
-      offerings?.current?.availablePackages?.length
-    ) {
-      try {
-        const packageToBuy = offerings.current.availablePackages[0];
-        const purchaseInfo = await purchasesSdk.purchasePackage(packageToBuy);
-        const active = Boolean(
-          purchaseInfo?.customerInfo?.entitlements?.active?.[rcEntitlement],
-        );
-        if (active) {
-          setIsPro(true);
-          await AsyncStorage.setItem("isPro", "true");
-          Alert.alert("Pro activated", "Thank you for upgrading to Pro.");
-          return;
-        }
-      } catch (error) {
-        console.error(error);
-      }
-    }
-
-    const upiUri =
-      "upi://pay?pa=your-upi-id@okaxis&pn=GST%20EMI%20Calculator&am=199&cu=INR&tn=Pro%20Upgrade";
-    try {
-      const supported = await Linking.canOpenURL(upiUri);
-      if (supported) {
-        await Linking.openURL(upiUri);
-        return;
-      }
-    } catch (error) {
-      console.error(error);
-    }
-
-    Alert.alert(
-      "Upgrade to Pro",
-      "Billing fallback: Add your real UPI ID or configure RevenueCat keys/offering in app config.",
-      [
-        { text: "Not now" },
-        {
-          text: "Enable Demo Pro",
-          onPress: () => setIsPro(true),
-        },
-      ],
-    );
-  };
-
-  const restorePurchases = async () => {
-    if (!purchasesSdk || !billingReady) {
-      Alert.alert("Restore unavailable", "Billing is not configured yet.");
-      return;
-    }
-
-    try {
-      const info = await purchasesSdk.restorePurchases();
-      const active = Boolean(info?.entitlements?.active?.[rcEntitlement]);
-      setIsPro(active);
-      if (active) {
-        await AsyncStorage.setItem("isPro", "true");
-      } else {
-        await AsyncStorage.removeItem("isPro");
-      }
-      Alert.alert(
-        active ? "Pro restored" : "No active purchase",
-        "Restore completed.",
-      );
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Restore failed", "Could not restore purchases right now.");
-    }
-  };
-
-  const exportScheduleCsv = async () => {
-    if (!emiResult.valid) return;
-    if (!ensureCanExport()) return;
-    // Removed interstitial ad before export
-    const rowsForExport = isPro
-      ? safeScheduleRows
-      : safeScheduleRows.slice(0, FREE_EXPORT_ROW_LIMIT);
-    const csv = buildScheduleCsv(rowsForExport);
-    const fileName = `emi-schedule-${Date.now()}.csv`;
-    try {
-      if (Platform.OS === "web") {
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", fileName);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-        setExportMessage(
-          isPro
-            ? "CSV downloaded in browser."
-            : `CSV downloaded (free preview: first ${FREE_EXPORT_ROW_LIMIT} rows).`,
-        );
-        registerExportUsage();
-        return;
-      }
-      // @ts-ignore
-      const outputPath = `${FileSystem.documentDirectory ?? ""}${fileName}`;
-      // @ts-ignore
-      await FileSystem.writeAsStringAsync(outputPath, csv);
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(outputPath, {
-          dialogTitle: "Share EMI Schedule CSV",
-          mimeType: "text/csv",
-        });
-      }
-      setExportMessage("CSV exported successfully.");
-      safeMessage("CSV exported successfully.");
-      registerExportUsage();
-    } catch (error) {
-      setExportMessage("CSV export failed.");
-      safeMessage("CSV export failed.");
-      console.error(error);
-    }
-  };
-
-  const exportSchedulePdf = async () => {
-    if (!emiResult.valid) return;
-    if (!ensureCanExport()) return;
-    // Removed interstitial ad before export
-    const rowsForExport = isPro
-      ? safeScheduleRows
-      : safeScheduleRows.slice(0, FREE_EXPORT_ROW_LIMIT);
-    const html = buildScheduleHtml(
-      rowsForExport,
-      emiResult.emi ?? 0,
-      emiResult.prepaymentSummary?.applied
-        ? emiResult.prepaymentSummary.interestAfterPrepayment
-        : (emiResult.totalInterest ?? 0),
-      emiResult.prepaymentSummary?.applied
-        ? safeScheduleRows.reduce(
-            (sum, row) => sum + row.emiPaid + row.prepaymentPart,
-            0,
-          ) + (emiResult.feeAmount ?? 0)
-        : (emiResult.totalOutflow ?? 0),
-    );
-
-    try {
-      if (Platform.OS === "web") {
-        await Print.printAsync({ html });
-        setExportMessage(
-          isPro
-            ? "PDF print dialog opened."
-            : `PDF preview opened (first ${FREE_EXPORT_ROW_LIMIT} rows).`,
-        );
-        registerExportUsage();
-        return;
-      }
-
-      const printed = await Print.printToFileAsync({ html });
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(printed.uri, {
-          dialogTitle: "Share EMI Schedule PDF",
-          mimeType: "application/pdf",
-        });
-      }
-
-      setExportMessage("PDF exported successfully.");
-      safeMessage("PDF exported successfully.");
-      registerExportUsage();
-    } catch (error) {
-      setExportMessage("PDF export failed.");
-      safeMessage("PDF export failed.");
-      console.error(error);
-    }
-  };
 
   return (
-    <SafeAreaProvider>
-      <LinearGradient colors={theme.gradient as any} style={styles.gradient}>
-        <SafeAreaView style={styles.safeArea}>
-          <View style={[styles.orbLayer, { pointerEvents: "none" }]}>
-            <Animated.View
-              style={[styles.orb, styles.orbTop, { opacity: glowOpacity }]}
-            />
-            <Animated.View
-              style={[styles.orb, styles.orbBottom, { opacity: glowOpacity }]}
+    <View style={{ flex: 1, backgroundColor: isDark ? "#111827" : "#f3f4f6" }}>
+      {/* Animated BG */}
+      <Animated.View style={{
+        position: "absolute", top: bgTranslate, right: -width * 0.2, width: width * 1.2, height: width * 1.2, borderRadius: width * 0.6,
+        backgroundColor: isDark ? "#2563eb" : "#a5b4fc", opacity: 0.18,
+        zIndex: 0,
+      }} />
+      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+        {/* Header */}
+        <View style={{ marginTop: 48, marginBottom: 8, alignItems: "flex-start", paddingHorizontal: 24 }}>
+          <Text style={{ fontSize: 32, fontWeight: "bold", color: isDark ? "#fff" : "#111" }}>{`GST + EMI\nCalculator`}</Text>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", fontSize: 16, marginTop: 4 }}>
+            Fast, accurate, and built for Indian billing + loan planning.
+          </Text>
+        </View>
+        {/* Light/Dark toggle */}
+        <Pressable
+          style={{ position: "absolute", top: 48, right: 24, backgroundColor: isDark ? "#1e293b" : "#e0e7ef", borderRadius: 16, padding: 12 }}
+          onPress={() => setTheme(isDark ? "light" : "dark")}
+        >
+          <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>{isDark ? "Light" : "Dark"}</Text>
+        </Pressable>
+        {/* Free Plan Card */}
+        <View style={{ backgroundColor: isDark ? "#1e293b" : "#fff", borderRadius: 16, margin: 24, marginTop: 16, padding: 16, borderWidth: 1, borderColor: isDark ? "#2563eb33" : "#a5b4fc", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>Free Plan</Text>
+            <Text style={{ color: "#2dd4bf", fontWeight: "bold" }}>{exportsLeft} exports left today</Text>
+          </View>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 4, marginBottom: 12 }}>
+            Free exports include first 24 rows. Upgrade for unlimited full exports and ad-free use.
+          </Text>
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <Pressable style={{ backgroundColor: "#38bdf8", borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16, marginRight: 8 }} onPress={() => {}}>
+              <Text style={{ color: "#fff", fontWeight: "bold" }}>Upgrade to Pro</Text>
+            </Pressable>
+            <Pressable style={{ backgroundColor: isDark ? "#334155" : "#e0e7ef", borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16 }} onPress={() => {}}>
+              <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>Restore</Text>
+            </Pressable>
+          </View>
+        </View>
+        {/* Tabs */}
+        <View style={{ flexDirection: "row", justifyContent: "center", marginBottom: 12, gap: 8 }}>
+           {['GST', 'EMI', 'TAX'].map(t => (
+             <Pressable
+               key={t}
+               onPress={() => setTab(t)}
+               style={{ backgroundColor: tab === t ? "#38bdf8" : isDark ? "#1e293b" : "#e0e7ef", borderRadius: 12, paddingVertical: 8, paddingHorizontal: 32, marginHorizontal: 4 }}
+             >
+               <Text style={{ color: tab === t ? "#111" : isDark ? "#fff" : "#111", fontWeight: "bold" }}>{t}</Text>
+             </Pressable>
+           ))}
+         </View>
+
+         {/* GST Calculator */}
+         {tab === "GST" && (
+           <View style={{ backgroundColor: isDark ? "#1e293b" : "#fff", borderRadius: 16, margin: 24, marginTop: 0, padding: 16, borderWidth: 1, borderColor: isDark ? "#2563eb33" : "#a5b4fc", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8 }}>
+             <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", fontSize: 20 }}>GST Calculator</Text>
+             {/* Inputs */}
+             <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+               <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Amount (INR)</Text>
+               <TextInput value={amount} onChangeText={setAmount} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+             </View>
+              <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+                <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>GST Rate (%)</Text>
+                <TextInput
+                  value={gstRate}
+                  onChangeText={text => {
+                    // Allow only numbers and max 3 digits
+                    const sanitized = text.replace(/[^0-9]/g, '').slice(0, 3);
+                    setGstRate(sanitized);
+                  }}
+                  keyboardType="numeric"
+                  maxLength={3}
+                  style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }}
+                />
+              </View>
+             <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+               <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>GST Type</Text>
+               <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                 <Pressable onPress={() => setGstType("add")} style={buttonBase(gstType === "add", isDark)}>
+                   <Text style={buttonText(gstType === "add", isDark)}>Add</Text>
+                 </Pressable>
+                 <Pressable onPress={() => setGstType("incl")} style={buttonBase(gstType === "incl", isDark)}>
+                   <Text style={buttonText(gstType === "incl", isDark)}>Included</Text>
+                 </Pressable>
+               </View>
+             </View>
+              <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+                <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Split Type</Text>
+                <View style={{ flexDirection: "row", gap: 8, marginTop: 4 }}>
+                  <Pressable onPress={() => setSplitType("none")} style={buttonBase(splitType === "none", isDark)}>
+                    <Text style={buttonText(splitType === "none", isDark)}>No Split</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setSplitType("igst")} style={buttonBase(splitType === "igst", isDark)}>
+                    <Text style={buttonText(splitType === "igst", isDark)}>IGST</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setSplitType("cgst")} style={buttonBase(splitType === "cgst", isDark)}>
+                    <Text style={buttonText(splitType === "cgst", isDark)}>CGST+SGST</Text>
+                  </Pressable>
+                </View>
+              </View>
+             {/* Results */}
+             <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 12, padding: 12, marginTop: 16, minHeight: 180 }}>
+               <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", marginBottom: 4, fontSize: 16 }}>GST Calculation</Text>
+               <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+                 <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Taxable Amount</Text>
+                 <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{taxable.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+               </View>
+               <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+                 <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>GST Amount</Text>
+                 <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{gstAmt.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+               </View>
+                {splitType === "igst" && (
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+                    <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>IGST</Text>
+                    <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{igst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                  </View>
+                )}
+                {splitType === "cgst" && (
+                  <>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+                      <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>CGST</Text>
+                      <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{cgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                    </View>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+                      <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>SGST</Text>
+                      <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{sgst.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                    </View>
+                  </>
+                )}
+               <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+                 <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Final Amount</Text>
+                 <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{finalAmt.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+               </View>
+               <Text style={{ color: "#22d3ee", fontStyle: "italic", marginTop: 2, fontSize: 13 }}>
+                 {amountInWords(Math.round(finalAmt))}
+               </Text>
+             </View>
+             {/* Reset Button */}
+             <Pressable onPress={resetGST} style={resetButton(isDark)}>
+               <Text style={resetButtonText}>Reset GST Fields</Text>
+             </Pressable>
+           </View>
+         )}
+         {/* EMI Calculator */}
+                {tab === "EMI" && (
+                   <EMICalculatorCard isDark={isDark} />
+                )}
+         {/* Tax Estimator */}
+         {tab === "TAX" && (
+           <TaxEstimatorCard isDark={isDark} />
+         )}
+       </ScrollView>
+     </View>
+   );
+  }
+
+    // EMI Calculator Card Component
+    function EMICalculatorCard({ isDark }) {
+  // State
+  const [loanAmount, setLoanAmount] = useState("500000");
+  const [interest, setInterest] = useState("10.5");
+  const [tenure, setTenure] = useState("5");
+  const [tenureType, setTenureType] = useState("years");
+  const [fee, setFee] = useState("1");
+  const [prepayMonth, setPrepayMonth] = useState("12");
+  const [prepayAmt, setPrepayAmt] = useState("100000");
+  const [compare, setCompare] = useState(false);
+  // Affordability
+  const [income, setIncome] = useState("80000");
+  const [expenses, setExpenses] = useState("35000");
+  const [existingEmi, setExistingEmi] = useState("5000");
+
+  // Calculations
+  const P = parseFloat(loanAmount) || 0;
+  const r = (parseFloat(interest) || 0) / 12 / 100;
+  const n = (parseFloat(tenure) || 0) * (tenureType === "years" ? 12 : 1);
+  const procFee = (parseFloat(fee) || 0) / 100 * P;
+  // EMI Formula
+  const emi = r === 0 ? P / n : (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+  // Affordability
+  const dispIncome = (parseFloat(income) || 0) - (parseFloat(expenses) || 0) - (parseFloat(existingEmi) || 0);
+  const safeEmi = dispIncome * 0.675;
+  const emiCap = dispIncome * 0.4;
+  const recLoan = emi > 0 && r > 0 ? emi > safeEmi ? (safeEmi * (Math.pow(1 + r, n) - 1)) / (r * Math.pow(1 + r, n)) : P : 0;
+  // Prepayment
+  const prepay = parseFloat(prepayAmt) || 0;
+  const prepayM = parseInt(prepayMonth) || 0;
+  let newN = n;
+  let interestSaved = 0;
+  if (prepay > 0 && prepayM > 0 && prepayM < n) {
+    let balance = P;
+    for (let i = 1; i <= prepayM; i++) {
+      const intPart = balance * r;
+      const prinPart = emi - intPart;
+      balance -= prinPart;
+    }
+    balance -= prepay;
+    let tempN = 0;
+    let tempBal = balance;
+    while (tempBal > 0 && tempN < 1000) {
+      const intPart = tempBal * r;
+      const prinPart = emi - intPart;
+      tempBal -= prinPart;
+      tempN++;
+    }
+    newN = prepayM + tempN;
+    interestSaved = emi * n - emi * newN;
+  }
+  // Amortization Table
+  let amort = [];
+  let bal = P;
+  for (let i = 1; i <= 6; i++) {
+    const intPart = bal * r;
+    const prinPart = emi - intPart;
+    bal -= prinPart;
+    amort.push({
+      m: i,
+      emi: emi,
+      int: intPart,
+      prin: prinPart,
+      bal: Math.max(bal, 0),
+    });
+  }
+  // Reset
+  function resetEMI() {
+    setLoanAmount("500000");
+    setInterest("10.5");
+    setTenure("5");
+    setTenureType("years");
+    setFee("1");
+    setPrepayMonth("12");
+    setPrepayAmt("100000");
+    setCompare(false);
+    setIncome("80000");
+    setExpenses("35000");
+    setExistingEmi("5000");
+  }
+  return (
+    <View style={{ backgroundColor: isDark ? "#1e293b" : "#fff", borderRadius: 16, margin: 24, marginTop: 0, padding: 16, borderWidth: 1, borderColor: isDark ? "#2563eb33" : "#a5b4fc", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8 }}>
+      <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", fontSize: 20 }}>EMI Calculator</Text>
+      {/* Inputs */}
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Loan Amount (INR)</Text>
+        <TextInput value={loanAmount} onChangeText={setLoanAmount} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+      </View>
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Annual Interest (%)</Text>
+        <TextInput value={interest} onChangeText={setInterest} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+      </View>
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <View style={{ minHeight: 88, justifyContent: 'flex-start' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>
+              {tenureType === "years" ? "Tenure (Years)" : "Tenure (Months)"}
+            </Text>
+            {tenureType === "years" && (Number(tenure) < 1 || Number(tenure) > 200 || tenure === "") && tenure !== "" && (
+              <Text style={{ color: 'red', marginLeft: 8, fontSize: 12 }}>
+                Invalid input, please enter between 1 and 200.
+              </Text>
+            )}
+          </View>
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <TextInput
+              value={tenure}
+              onChangeText={text => {
+                // Allow only numbers and max 3 digits
+                const sanitized = text.replace(/[^0-9]/g, '').slice(0, 3);
+                setTenure(sanitized);
+              }}
+              keyboardType="numeric"
+              maxLength={3}
+              style={{
+                backgroundColor: 'transparent',
+                color: isDark ? "#fff" : "#111",
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 18,
+                fontWeight: "bold"
+              }}
+              placeholder={tenureType === "years" ? "Enter years" : "Enter months"}
             />
           </View>
-          {/* @ts-ignore */}
-          <StatusBar style={theme.statusBar as any} />
-          <KeyboardAvoidingView
-            style={styles.flex}
-            behavior={Platform.OS === "ios" ? "padding" : undefined}
-          >
-            <ScrollView contentContainerStyle={styles.container}>
-              {/* Mode Toggle */}
-              <View style={styles.toggleWrap}>
-                {["GST", "EMI", "TAX"].map((m) => (
-                  <Pressable
-                    key={m}
-                    style={[
-                      styles.modeButton,
-                      mode === m && styles.modeButtonActive,
-                    ]}
-                    onPress={() => setMode(m as Mode)}
-                  >
-                    <Text
-                      style={[
-                        styles.modeButtonText,
-                        mode === m && styles.modeButtonTextActive,
-                      ]}
-                    >
-                      {m}
-                    </Text>
-                  </Pressable>
-                ))}
-              </View>
-
-              {/* GST Calculator */}
-              {mode === "GST" && (
-                <View style={styles.card}>
-                  <Text style={styles.sectionTitle}>GST Calculator</Text>
-                  <Input
-                    styles={styles}
-                    theme={theme}
-                    label="Amount"
-                    value={amount}
-                    placeholder="Enter amount"
-                    onChangeText={setAmount}
-                  />
-                  <Input
-                    styles={styles}
-                    theme={theme}
-                    label="GST Rate (%)"
-                    value={gstRate}
-                    placeholder="Enter GST rate"
-                    onChangeText={setGstRate}
-                  />
-                  <Segment
-                    styles={styles}
-                    value={gstMode}
-                    options={[
-                      { label: "Exclusive", value: "EXCLUSIVE" },
-                      { label: "Inclusive", value: "INCLUSIVE" },
-                    ]}
-                    onChange={(v) => setGstMode(v as GstMode)}
-                  />
-                  {gstResult.valid ? (
-                    <View>
-                      <ResultRow
-                        styles={styles}
-                        label="Taxable Value"
-                        value={formatINR(gstResult.taxableValue!)}
-                      />
-                      <ResultRow
-                        styles={styles}
-                        label="GST Amount"
-                        value={formatINR(gstResult.taxAmount!)}
-                      />
-                      <ResultRow
-                        styles={styles}
-                        label="Total Amount"
-                        value={formatINR(gstResult.totalAmount!)}
-                        highlight
-                      />
-                    </View>
-                  ) : (
-                    <Text style={{ color: "red" }}>{gstResult.error}</Text>
-                  )}
-                </View>
-              )}
-
-              {/* EMI Calculator */}
-              {mode === "EMI" && (
-                <View style={styles.card}>
-                  <Text style={styles.sectionTitle}>EMI Calculator</Text>
-                  <Input
-                    styles={styles}
-                    theme={theme}
-                    label="Principal"
-                    value={principal}
-                    placeholder="Enter principal"
-                    onChangeText={setPrincipal}
-                  />
-                  <Input
-                    styles={styles}
-                    theme={theme}
-                    label="Annual Rate (%)"
-                    value={annualRate}
-                    placeholder="Enter annual rate"
-                    onChangeText={setAnnualRate}
-                  />
-                  <Input
-                    styles={styles}
-                    theme={theme}
-                    label="Tenure"
-                    value={tenureValue}
-                    placeholder="Enter tenure in years"
-                    onChangeText={setTenureValue}
-                  />
-                  {/* Only show years, remove months option */}
-                  {/*
-                  <Segment
-                    styles={styles}
-                    value={tenureUnit}
-                    options={[
-                      { label: "Years", value: "YEARS" },
-                      { label: "Months", value: "MONTHS" },
-                    ]}
-                    onChange={(v) => setTenureUnit(v as TenureUnit)}
-                  />
-                  */}
-                  {emiResult.valid ? (
-                    <View>
-                      <ResultRow
-                        styles={styles}
-                        label="EMI"
-                        value={formatINR(emiResult.emi!)}
-                        highlight
-                      />
-                      <ResultRow
-                        styles={styles}
-                        label="Total Interest"
-                        value={formatINR(emiResult.totalInterest!)}
-                      />
-                      <ResultRow
-                        styles={styles}
-                        label="Total Payment"
-                        value={formatINR(emiResult.totalPayment!)}
-                      />
-                    </View>
-                  ) : (
-                    <Text style={{ color: "red" }}>{emiResult.error}</Text>
-                  )}
-                  <AnimatedPressable
-                    onPress={exportScheduleCsv}
-                    style={styles.upgradeButton}
-                  >
-                    <Text style={styles.upgradeButtonText}>Export CSV</Text>
-                  </AnimatedPressable>
-                  <AnimatedPressable
-                    onPress={exportSchedulePdf}
-                    style={styles.upgradeButton}
-                  >
-                    <Text style={styles.upgradeButtonText}>Export PDF</Text>
-                  </AnimatedPressable>
-                  {exportMessage ? (
-                    <Text style={{ color: "green" }}>{exportMessage}</Text>
-                  ) : null}
-                </View>
-              )}
-
-              {/* TAX Calculator (optional, placeholder) */}
-              {mode === "TAX" && (
-                <View style={styles.card}>
-                  <Text style={styles.sectionTitle}>
-                    Tax Calculator (Coming Soon)
-                  </Text>
-                </View>
-              )}
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </SafeAreaView>
-      </LinearGradient>
-    </SafeAreaProvider>
-  );
-
-  // Helper for formatting numbers (fixes missing formatNumber error)
-  function formatNumber(n: number | undefined): string {
-    if (typeof n !== "number" || isNaN(n)) return "-";
-    return n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
-  }
-
-  type InputProps = {
-    styles: ReturnType<typeof createStyles>;
-    theme: ThemePalette;
-    label: string;
-    value: string;
-    placeholder: string;
-    onChangeText: (text: string) => void;
-  };
-
-  function Input({
-    styles,
-    theme,
-    label,
-    value,
-    placeholder,
-    onChangeText,
-  }: InputProps) {
-    return (
-      <View style={styles.inputGroup}>
-        <Text style={styles.label}>{label}</Text>
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={theme.placeholder}
-          keyboardType="decimal-pad"
-          style={styles.input}
-        />
+        </View>
       </View>
-    );
-  }
-
-  type SegmentOption = {
-    label: string;
-    value: string;
-  };
-
-  type SegmentProps = {
-    styles: ReturnType<typeof createStyles>;
-    value: string;
-    options: SegmentOption[];
-    onChange: (value: string) => void;
-  };
-
-  function Segment({ styles, value, options, onChange }: SegmentProps) {
-    return (
-      <View style={styles.segmentContainer}>
-        {options.map((option) => (
-          <AnimatedPressable
-            key={option.value}
-            style={[
-              styles.segmentButton,
-              value === option.value && styles.segmentButtonActive,
-            ]}
-            onPress={() => onChange(option.value)}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                value === option.value && styles.segmentTextActive,
-              ]}
-            >
-              {option.label}
-            </Text>
-          </AnimatedPressable>
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Processing Fee (%)</Text>
+        <TextInput value={fee} onChangeText={setFee} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+      </View>
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>One-time Prepayment Month</Text>
+        <TextInput value={prepayMonth} onChangeText={setPrepayMonth} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+      </View>
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>One-time Prepayment Amount (INR)</Text>
+        <TextInput value={prepayAmt} onChangeText={setPrepayAmt} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+      </View>
+      {/* Years/Months toggle */}
+      <View style={{ flexDirection: "row", gap: 8, marginVertical: 8 }}>
+        <Pressable onPress={() => setTenureType("years")} style={uniformButton(tenureType === "years", isDark)}>
+          <Text style={uniformButtonText(tenureType === "years", isDark)}>Years</Text>
+        </Pressable>
+        <Pressable onPress={() => setTenureType("months")} style={uniformButton(tenureType === "months", isDark)}>
+          <Text style={uniformButtonText(tenureType === "months", isDark)}>Months</Text>
+        </Pressable>
+      </View>
+      {/* Compare Offer toggle */}
+      <View style={{ flexDirection: "row", gap: 8, marginBottom: 8 }}>
+        <Pressable onPress={() => setCompare(false)} style={uniformButton(!compare, isDark)}>
+          <Text style={uniformButtonText(!compare, isDark)}>Compare Offer: Off</Text>
+        </Pressable>
+        <Pressable onPress={() => setCompare(true)} style={uniformButton(compare, isDark)}>
+          <Text style={uniformButtonText(compare, isDark)}>Compare Offer: On</Text>
+        </Pressable>
+      </View>
+      {/* Show these fields only if Compare Offer: On is selected */}
+      {compare && (
+        <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 4, marginBottom: 8 }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 4 }}>Total Income (INR)</Text>
+          <TextInput value={income} onChangeText={setIncome} keyboardType="numeric" style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 8 }}>Age</Text>
+          <TextInput
+            value={age}
+            onChangeText={setAge}
+            keyboardType="numeric"
+            style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 14, fontWeight: "bold" }}
+            placeholder="Enter your Age here"
+            placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
+          />
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 8 }}>Gender</Text>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 4, marginBottom: 8 }}>
+            <Pressable onPress={() => setGender("male")} style={uniformButton(gender === "male", isDark)}>
+              <Text style={uniformButtonText(gender === "male", isDark)}>Male</Text>
+            </Pressable>
+            <Pressable onPress={() => setGender("female")} style={uniformButton(gender === "female", isDark)}>
+              <Text style={uniformButtonText(gender === "female", isDark)}>Female</Text>
+            </Pressable>
+          </View>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 8 }}>Residential Status</Text>
+          <View style={{ flexDirection: "row", gap: 8, marginTop: 4, marginBottom: 4 }}>
+            <Pressable onPress={() => setResidentialStatus("resident")} style={uniformButton(residentialStatus === "resident", isDark)}>
+              <Text style={uniformButtonText(residentialStatus === "resident", isDark)}>Resident</Text>
+            </Pressable>
+            <Pressable onPress={() => setResidentialStatus("nri")} style={uniformButton(residentialStatus === "nri", isDark)}>
+              <Text style={uniformButtonText(residentialStatus === "nri", isDark)}>Non-Resident</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+      {/* Affordability Planner */}
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 12, padding: 12, marginVertical: 8 }}>
+        <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", marginBottom: 4 }}>Affordability Planner</Text>
+        <Text style={{ color: isDark ? "#38bdf8" : "#2563eb", fontSize: 13, marginBottom: 4 }}>
+          <Text style={{ fontWeight: 'bold' }}>Safe EMI (Recommended):</Text> This is set at 67.5% of your disposable income. While many financial advisors recommend keeping EMIs below 40–50% of your net income, this higher threshold is for users comfortable with higher risk or lower expenses. Adjust as per your comfort.
+        </Text>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Monthly Income (INR)</Text>
+        <TextInput value={income} onChangeText={setIncome} keyboardType="numeric" style={{ backgroundColor: isDark ? "#1e293b" : "#fff", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 8, marginTop: 2, fontSize: 16 }} />
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 4 }}>Monthly Expenses (INR)</Text>
+        <TextInput value={expenses} onChangeText={setExpenses} keyboardType="numeric" style={{ backgroundColor: isDark ? "#1e293b" : "#fff", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 8, marginTop: 2, fontSize: 16 }} />
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 4 }}>Existing EMIs (INR)</Text>
+        <TextInput value={existingEmi} onChangeText={setExistingEmi} keyboardType="numeric" style={{ backgroundColor: isDark ? "#1e293b" : "#fff", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 8, marginTop: 2, fontSize: 16 }} />
+        <View style={{ marginTop: 8 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Disposable Income</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{dispIncome.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: "#38bdf8" }}>Safe EMI (Recommended)</Text>
+            <Text style={{ color: "#38bdf8", fontWeight: "bold" }}>₹{safeEmi.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>EMI Cap by 40% Rule</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{emiCap.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+          </View>
+          <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+            <Text style={{ color: "#22d3ee" }}>Recommended Loan Amount</Text>
+            <Text style={{ color: "#22d3ee", fontWeight: "bold" }}>₹{recLoan.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+          </View>
+        </View>
+      </View>
+      {/* EMI Results */}
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 12, padding: 12, marginVertical: 8 }}>
+        <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", marginBottom: 4, fontSize: 16 }}>Monthly EMI</Text>
+        <Text style={{ color: "#38bdf8", fontWeight: "bold", fontSize: 18, marginBottom: 6 }}>₹{emi.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Loan Tenure</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111" }}>{n} months</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Total Interest</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{(emi * n - P).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Total Repayment</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{(emi * n).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Processing Fee</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{procFee.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        </View>
+        <Text style={{ color: "#22d3ee", fontWeight: "bold", marginTop: 4 }}>Total Outflow</Text>
+        <Text style={{ color: "#22d3ee", fontWeight: "bold", fontSize: 16 }}>₹{(emi * n + procFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        <Text style={{ color: "#22d3ee", fontStyle: "italic", marginTop: 2, fontSize: 13 }}>
+          {amountInWords(Math.round(emi * n + procFee))}
+        </Text>
+      </View>
+      {/* Prepayment Impact */}
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 12, padding: 12, marginVertical: 8 }}>
+        <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", marginBottom: 4 }}>Prepayment Impact</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Prepayment Applied</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{prepay.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>New Tenure</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111" }}>{Math.round(newN)} months</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Tenure Saved</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111" }}>{Math.round(n - newN)} months</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Interest Saved</Text>
+          <Text style={{ color: "#38bdf8", fontWeight: "bold" }}>₹{interestSaved.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        </View>
+      </View>
+      {/* Export Buttons */}
+      <View style={{ flexDirection: "row", gap: 8, marginVertical: 8 }}>
+        <Pressable
+          style={uniformButtonSolid}
+          onPress={async () => {
+            // TODO: Insert CSV export logic here
+          }}
+        >
+          <Text style={uniformButtonSolidText}>Export CSV</Text>
+        </Pressable>
+        <Pressable
+          style={uniformButtonSolid}
+          onPress={async () => {
+            // TODO: Insert PDF export logic here
+          }}
+        >
+          <Text style={uniformButtonSolidText}>Export PDF</Text>
+        </Pressable>
+      </View>
+      {/* Amortization Table */}
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 12, padding: 12, marginVertical: 8 }}>
+        <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", marginBottom: 4, fontSize: 16 }}>First 6 Months Amortization</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", width: 60 }}>Month</Text>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", width: 80 }}>Payment</Text>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", width: 60 }}>Interest</Text>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", width: 80 }}>Balance</Text>
+        </View>
+        {amort.map((row, idx) => (
+          <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+            <Text style={{ color: isDark ? "#fff" : "#111", width: 60 }}>M{row.m}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", width: 80 }}>₹{row.emi.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", width: 60 }}>₹{row.int.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", width: 80 }}>₹{row.bal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+          </View>
         ))}
       </View>
-    );
+      {/* Reset Button */}
+      <Pressable onPress={resetEMI} style={resetButton(isDark)}>
+        <Text style={resetButtonText}>Reset EMI Fields</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// Tax Estimator Card Component
+function TaxEstimatorCard({ isDark }) {
+  // State
+  const [income, setIncome] = useState("");
+  const [deductions, setDeductions] = useState("");
+
+  // FY 2023-24 New Regime Tax Slabs
+  const taxSlabs = [
+    { from: 0, to: 300000, rate: 0 },
+    { from: 300000, to: 600000, rate: 0.05 },
+    { from: 600000, to: 900000, rate: 0.1 },
+    { from: 900000, to: 1200000, rate: 0.15 },
+    { from: 1200000, to: 1500000, rate: 0.2 },
+    { from: 1500000, rate: 0.3 },
+  ];
+  // For new regime, just use total income field
+  const totalIncome = parseFloat(income) || 0;
+  // Robust deduction parsing (clarify only NPS employer contribution allowed in new regime)
+  const totalDeductions = (deductions.match(/\d+/g) || []).reduce((a, b) => parseFloat(a) + parseFloat(b), 0);
+  const taxableIncome = Math.max(0, totalIncome - totalDeductions);
+  let taxAmount = 0;
+  let prevTo = 0;
+  for (const slab of taxSlabs) {
+    if (taxableIncome <= slab.from) break;
+    const to = slab.to || taxableIncome;
+    taxAmount += (Math.min(to, taxableIncome) - Math.max(prevTo, slab.from)) * slab.rate;
+    prevTo = to;
+  }
+  // Section 87A rebate: If taxable income <= 7 lakh, tax = 0
+  let rebate = 0;
+  if (taxableIncome <= 700000) {
+    rebate = taxAmount;
+    taxAmount = 0;
+  }
+  // 4% Health & Education Cess
+  const cess = taxAmount * 0.04;
+  const totalTax = taxAmount + cess;
+  const netIncome = totalIncome - totalTax;
+
+  // Reset
+  function resetTax() {
+    setIncome("");
+    setDeductions("");
   }
 
-  type ResultRowProps = {
-    styles: ReturnType<typeof createStyles>;
-    label: string;
-    value?: string;
-    valueNode?: ReactNode;
-    highlight?: boolean;
-    delay?: number;
-  };
-
-  function ResultRow({
-    styles,
-    label,
-    value,
-    valueNode,
-    highlight = false,
-    delay = 0,
-  }: ResultRowProps) {
-    const reveal = useRef(new Animated.Value(0)).current;
-
-    useEffect(() => {
-      reveal.setValue(0);
-      Animated.timing(reveal, {
-        toValue: 1,
-        duration: 420,
-        delay,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }).start();
-    }, [delay, reveal, value, valueNode]);
-
-    return (
-      <Animated.View
-        style={[
-          styles.resultRow,
-          {
-            opacity: reveal,
-            transform: [
-              {
-                translateY: typeof reveal === "number" ? reveal : 0,
-              },
-            ],
-          },
-        ]}
-      >
-        <Text style={[styles.resultLabel, highlight && styles.highlightText]}>
-          {label}
-        </Text>
-        {valueNode ?? (
-          <Text style={[styles.resultValue, highlight && styles.highlightText]}>
-            {value ?? ""}
-          </Text>
-        )}
-      </Animated.View>
-    );
-  }
-
-  type AnimatedPressableProps = {
-    children: ReactNode;
-    onPress: () => void;
-    style?: StyleProp<any>;
-    glowColor?: string;
-  };
-
-  function AnimatedPressable({
-    children,
-    onPress,
-    style,
-    glowColor = "#38bdf8",
-  }: AnimatedPressableProps) {
-    const pressScale = useRef(new Animated.Value(1)).current;
-    const glowLevel = useRef(new Animated.Value(0)).current;
-
-    const handlePressIn = () => {
-      Animated.parallel([
-        Animated.spring(pressScale, {
-          toValue: 0.96,
-          useNativeDriver: true,
-          speed: 32,
-          bounciness: 6,
-        }),
-        Animated.timing(glowLevel, {
-          toValue: 1,
-          duration: 170,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: false,
-        }),
-      ]).start();
-    };
-
-    const handlePressOut = () => {
-      Animated.parallel([
-        Animated.spring(pressScale, {
-          toValue: 1,
-          useNativeDriver: true,
-          speed: 24,
-          bounciness: 9,
-        }),
-        Animated.timing(glowLevel, {
-          toValue: 0,
-          duration: 220,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: false,
-        }),
-      ]).start();
-    };
-
-    return (
-      <Animated.View
-        style={[
-          style,
-          {
-            transform: [{ scale: pressScale }],
-          },
-        ]}
-      >
-        <Pressable
-          onPress={onPress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          style={interactiveStyles.pressableFill}
-        >
-          <Animated.View
-            style={[
-              interactiveStyles.pressableGlow,
-              {
-                backgroundColor: glowColor,
-                opacity: glowLevel.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, 0.22],
-                }),
-                transform: [
-                  {
-                    scale: glowLevel.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [0.96, 1.06],
-                    }),
-                  },
-                ],
-                // pointerEvents: "none" // If needed, add here
-              },
-            ]}
-          />
-          {children}
-        </Pressable>
-      </Animated.View>
-    );
-  }
-
-  type AnimatedMetricTextProps = {
-    value: number;
-    formatter: (num: number) => string;
-    style?: StyleProp<any>;
-  };
-
-  function AnimatedMetricText({
-    value,
-    formatter,
-    style,
-  }: AnimatedMetricTextProps) {
-    const animatedValue = useRef(
-      new Animated.Value(Number.isFinite(value) ? value : 0),
-    ).current;
-    const [displayValue, setDisplayValue] = useState(
-      Number.isFinite(value) ? value : 0,
-    );
-
-    useEffect(() => {
-      const target = Number.isFinite(value) ? value : 0;
-      const id = animatedValue.addListener(({ value: current }) => {
-        setDisplayValue(current);
-      });
-
-      Animated.timing(animatedValue, {
-        toValue: target,
-        duration: 520,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: false,
-      }).start();
-
-      return () => {
-        animatedValue.removeListener(id);
-      };
-    }, [animatedValue, value]);
-
-    return <Text style={style}>{formatter(displayValue)}</Text>;
-  }
-
-  // Removed duplicate interactiveStyles definition (now only defined once above)
-
+  return (
+    <View style={{ backgroundColor: isDark ? "#1e293b" : "#fff", borderRadius: 16, margin: 24, marginTop: 0, padding: 16, borderWidth: 1, borderColor: isDark ? "#2563eb33" : "#a5b4fc", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8 }}>
+      <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", fontSize: 20 }}>Tax Estimator</Text>
+      {/* Inputs */}
+      <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 8 }}>Total Income (INR)</Text>
+      <TextInput value={income} onChangeText={setIncome} keyboardType="numeric" style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+      <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 8 }}>Deductions (Only NPS employer contribution allowed in New Regime)</Text>
+      <TextInput
+        value={deductions}
+        onChangeText={text => {
+          // Allow only numbers and commas
+          const sanitized = text.replace(/[^0-9,]/g, '');
+          setDeductions(sanitized);
+        }}
+        style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 14, fontWeight: "bold" }}
+        placeholder="Enter NPS deduction (eg., 50000)"
+        placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
+      />
+      {/* Results section */}
+      <View style={{ gap: 16, marginTop: 16 }}>
+        {/* Main scenario results (tax only) */}
+        <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", marginBottom: 4, fontSize: 16 }}>Tax Calculation</Text>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Taxable Income</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{taxableIncome.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Total Tax</Text>
+          <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold" }}>₹{totalTax.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        </View>
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2, marginTop: 8 }}>
+          <Text style={{ color: isDark ? "#cbd5e1" : "#334155", fontSize: 18, fontWeight: "bold" }}>Net Income</Text>
+          <Text style={{ color: isDark ? "#38bdf8" : "#2563eb", fontWeight: "bold", fontSize: 22 }}>₹{netIncome.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+        </View>
+        {/* Net Income in Words removed as per request */}
+      </View>
+      {/* If you have more UI below, keep it here */}
+    </View>
+  );
+}
