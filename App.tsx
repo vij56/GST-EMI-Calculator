@@ -1,10 +1,20 @@
 import React, { useState, useRef, useEffect } from "react";
 import { View, Text, TextInput, Pressable, Animated, Easing, StyleSheet, Dimensions, ScrollView, Platform } from "react-native";
+import { calculateEMI } from "./src/utils/emiCalculator";
+import {
+  validateLoanAmount,
+  validateInterest,
+  validateTenure,
+  validateFee,
+  validatePrepaymentMonth,
+  validatePrepaymentAmount
+} from "./src/utils/validation";
 
 
 const { width, height } = Dimensions.get("window");
 
-const GST_RATES = [3, 5, 12, 18, 28];
+// Define a single primary green color for the whole project
+const PRIMARY_GREEN = "#22c55e"; // Tailwind emerald-500
 
 function amountInWords(num) {
   const ones = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
@@ -72,17 +82,17 @@ function amountInWords(num) {
 // Shared button styles for consistency
 const buttonBase = (isActive, isDark) => ({
   flex: 1,
-  backgroundColor: isActive ? "#38bdf8" : isDark ? "#1e293b" : "#e0e7ef",
+  backgroundColor: isActive ? PRIMARY_GREEN : isDark ? "#14532d" : "#e0fce9",
   borderRadius: 8,
   paddingVertical: 10,
   alignItems: "center"
 });
 const buttonText = (isActive, isDark) => ({
-  color: isActive ? "#111" : isDark ? "#fff" : "#111",
+  color: isActive ? "#fff" : isDark ? "#fff" : "#111",
   fontWeight: "bold"
 });
 const resetButton = isDark => ({
-  backgroundColor: isDark ? "#0ea5e9" : "#38bdf8",
+  backgroundColor: PRIMARY_GREEN,
   borderRadius: 8,
   paddingVertical: 12,
   alignItems: "center",
@@ -94,7 +104,7 @@ const resetButtonText = {
 };
 const exportButton = {
   flex: 1,
-  backgroundColor: "#38bdf8",
+  backgroundColor: PRIMARY_GREEN,
   borderRadius: 8,
   paddingVertical: 10,
   alignItems: "center"
@@ -107,20 +117,20 @@ const exportButtonText = {
 // Strictly uniform button styles for all major action buttons
 const uniformButton = (isActive, isDark) => ({
   flex: 1,
-  backgroundColor: isActive ? "#38bdf8" : isDark ? "#1e293b" : "#e0e7ef",
+  backgroundColor: isActive ? PRIMARY_GREEN : isDark ? "#14532d" : "#e0fce9",
   borderRadius: 8,
   paddingVertical: 12,
   alignItems: "center",
   marginHorizontal: 2
 });
 const uniformButtonText = (isActive, isDark) => ({
-  color: isActive ? "#111" : isDark ? "#fff" : "#111",
+  color: isActive ? "#fff" : isDark ? "#fff" : "#111",
   fontWeight: "bold",
   fontSize: 16
 });
 const uniformButtonSolid = {
   flex: 1,
-  backgroundColor: "#38bdf8",
+  backgroundColor: PRIMARY_GREEN,
   borderRadius: 8,
   paddingVertical: 12,
   alignItems: "center",
@@ -196,7 +206,7 @@ export default function App() {
       {/* Animated BG */}
       <Animated.View style={{
         position: "absolute", top: bgTranslate, right: -width * 0.2, width: width * 1.2, height: width * 1.2, borderRadius: width * 0.6,
-        backgroundColor: isDark ? "#2563eb" : "#a5b4fc", opacity: 0.18,
+        backgroundColor: isDark ? PRIMARY_GREEN : "#bbf7d0", opacity: 0.18,
         zIndex: 0,
       }} />
       <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
@@ -238,9 +248,9 @@ export default function App() {
              <Pressable
                key={t}
                onPress={() => setTab(t)}
-               style={{ backgroundColor: tab === t ? "#38bdf8" : isDark ? "#1e293b" : "#e0e7ef", borderRadius: 12, paddingVertical: 8, paddingHorizontal: 32, marginHorizontal: 4 }}
+               style={{ backgroundColor: tab === t ? PRIMARY_GREEN : isDark ? "#14532d" : "#e0fce9", borderRadius: 12, paddingVertical: 8, paddingHorizontal: 32, marginHorizontal: 4 }}
              >
-               <Text style={{ color: tab === t ? "#111" : isDark ? "#fff" : "#111", fontWeight: "bold" }}>{t}</Text>
+               <Text style={{ color: tab === t ? "#fff" : isDark ? "#fff" : "#111", fontWeight: "bold" }}>{t}</Text>
              </Pressable>
            ))}
          </View>
@@ -253,6 +263,7 @@ export default function App() {
               <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
                 <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Amount (INR)</Text>
                 <TextInput value={amount} onChangeText={setAmount} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+                <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginTop: 2 }}>Enter the principal amount for GST calculation</Text>
                 {!isAmountValid && amount !== "" && (
                   <Text style={{ color: 'red', fontSize: 12 }}>Enter a valid amount &gt; 0</Text>
                 )}
@@ -270,6 +281,7 @@ export default function App() {
                    maxLength={3}
                    style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }}
                  />
+                 <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginTop: 2 }}>Enter the GST rate as a percentage (e.g., 18)</Text>
                  {!isGstRateValid && gstRate !== "" && (
                    <Text style={{ color: 'red', fontSize: 12 }}>Enter a valid GST rate &gt; 0</Text>
                  )}
@@ -374,78 +386,46 @@ export default function App() {
   const [prepayMonth, setPrepayMonth] = useState("");
   const [prepayAmt, setPrepayAmt] = useState("");
 
-  // --- Validations ---
-  const loanAmountNum = parseFloat(loanAmount);
-  const interestNum = parseFloat(interest);
-  const tenureNum = parseInt(tenure);
-  const feeNum = parseFloat(fee);
-  const prepayMonthNum = parseInt(prepayMonth);
-  const prepayAmtNum = parseFloat(prepayAmt);
-  const isLoanAmountValid = !isNaN(loanAmountNum) && loanAmountNum > 0;
-  const isInterestValid = !isNaN(interestNum) && interestNum >= 0;
-  const isTenureValid = !isNaN(tenureNum) && tenureNum > 0 && tenureNum <= (tenureType === "years" ? 200 : 2400);
-  const isFeeValid = fee === "" || (!isNaN(feeNum) && feeNum >= 0);
-  const isPrepayMonthValid = prepayMonth === "" || (!isNaN(prepayMonthNum) && prepayMonthNum > 0 && prepayMonthNum < tenureNum);
-  const isPrepayAmtValid = prepayAmt === "" || (!isNaN(prepayAmtNum) && prepayAmtNum >= 0);
+  // Advanced Prepayment UI State
+  const [prepayments, setPrepayments] = useState([]); // Array of {month, amount, frequency, penalty}
+  const [showAddPrepay, setShowAddPrepay] = useState(false);
+  const [newPrepayMonth, setNewPrepayMonth] = useState("");
+  const [newPrepayAmt, setNewPrepayAmt] = useState("");
+  const [newPrepayFreq, setNewPrepayFreq] = useState("one-time"); // one-time, monthly, yearly
+  const [newPrepayPenalty, setNewPrepayPenalty] = useState("");
+
+  // --- Validations (centralized) ---
+  const isLoanAmountValid = validateLoanAmount(loanAmount);
+  const isInterestValid = validateInterest(interest);
+  const isTenureValid = validateTenure(tenure, tenureType);
+  const isFeeValid = validateFee(fee);
+  const isPrepayMonthValid = validatePrepaymentMonth(prepayMonth, tenure);
+  const isPrepayAmtValid = validatePrepaymentAmount(prepayAmt);
   const allRequiredValid = isLoanAmountValid && isInterestValid && isTenureValid && isFeeValid && isPrepayMonthValid && isPrepayAmtValid;
 
-  // --- Calculations always up-to-date with latest state ---
-  // Only calculate if all required fields are valid
-  const P = isLoanAmountValid ? loanAmountNum : 0;
-  const annualRate = isInterestValid ? interestNum : 0;
-  const n = isTenureValid ? (tenureNum * (tenureType === "years" ? 12 : 1)) : 0;
-  const r = annualRate / 12 / 100;
-  const procFee = isFeeValid && fee !== "" ? (feeNum / 100 * P) : 0;
-  // EMI Formula (unrounded for totals)
-  let emiUnrounded = 0;
-  if (P > 0 && n > 0) {
-    emiUnrounded = r === 0 ? (P / n) : (P * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
-  }
-  // Displayed EMI (rounded for clarity)
-  const emi = Math.round(emiUnrounded * 100) / 100;
-
-  // Prepayment logic
-  const prepay = isPrepayAmtValid && prepayAmt !== "" ? prepayAmtNum : 0;
-  const prepayM = isPrepayMonthValid && prepayMonth !== "" ? prepayMonthNum : 0;
-  let newN = n;
-  let interestSaved = 0;
-  if (prepay > 0 && prepayM > 0 && prepayM < n) {
-    let balance = P;
-    for (let i = 1; i <= prepayM; i++) {
-      const intPart = balance * r;
-      const prinPart = emiUnrounded - intPart;
-      balance -= prinPart;
-    }
-    balance -= prepay;
-    let tempN = 0;
-    let tempBal = balance;
-    while (tempBal > 0 && tempN < 1000) {
-      const intPart = tempBal * r;
-      const prinPart = emiUnrounded - intPart;
-      tempBal -= prinPart;
-      tempN++;
-    }
-    newN = prepayM + tempN;
-    interestSaved = emiUnrounded * n - emiUnrounded * newN;
-  }
-
-  // Amortization Table (first 6 months)
-  let amort = [];
-  if (P > 0 && n > 0) {
-    let bal = P;
-    for (let i = 1; i <= 6; i++) {
-      const intPart = bal * r;
-      const prinPart = emiUnrounded - intPart;
-      bal -= prinPart;
-      amort.push({
-        m: i,
-        emi: emiUnrounded,
-        int: intPart,
-        prin: prinPart,
-        bal: Math.max(bal, 0),
-      });
-    }
-  }
+  // --- Calculations (centralized) ---
+  const emiResult = calculateEMI({
+    loanAmount,
+    interestRate: interest,
+    tenure,
+    tenureType,
+    fee,
+    prepayments: prepaymentOn
+      ? (prepayments.length > 0
+        ? prepayments
+        : (isPrepayMonthValid && isPrepayAmtValid && prepayMonth && prepayAmt
+          ? [{ startMonth: prepayMonth, amount: prepayAmt, frequency: 'one-time' }]
+          : []))
+      : []
+  });
+  const emi = emiResult.emi;
+  const emiUnrounded = emiResult.emi;
+  const n = emiResult.amortizationTable?.length ? emiResult.amortizationTable.length : 0;
+  const procFee = emiResult.procFee || 0;
+  const newN = emiResult.prepaymentImpact?.newTenure || n;
+  const interestSaved = emiResult.prepaymentImpact?.interestSaved || 0;
+  const amort = emiResult.amortizationTable?.slice(0, 6) || [];
+  const prepay = emiResult.prepaymentImpact?.prepaymentApplied || 0;
   // Reset
   function resetEMI() {
     setLoanAmount("");
@@ -464,52 +444,159 @@ export default function App() {
         <View style={{ flexDirection: 'row', justifyContent: 'center', width: '100%' }}>
           <Pressable
             onPress={() => setPrepaymentOn(false)}
-            style={{
-              flex: 1,
-              backgroundColor: !prepaymentOn ? '#38bdf8' : (isDark ? '#1e293b' : '#e0e7ef'),
-              borderRadius: 8,
-              paddingVertical: 10,
-              alignItems: 'center',
-              marginRight: 4,
-              borderWidth: !prepaymentOn ? 2 : 1,
-              borderColor: !prepaymentOn ? '#2563eb' : (isDark ? '#334155' : '#cbd5e1')
-            }}
+            style={{ ...uniformButton(!prepaymentOn, isDark), marginRight: 4, paddingVertical: 10 }}
           >
-            <Text style={{ color: !prepaymentOn ? '#111' : (isDark ? '#fff' : '#111'), fontWeight: 'bold' }}>Prepayment: Off</Text>
+            <Text style={uniformButtonText(!prepaymentOn, isDark)}>Prepayment: Off</Text>
           </Pressable>
           <Pressable
             onPress={() => setPrepaymentOn(true)}
-            style={{
-              flex: 1,
-              backgroundColor: prepaymentOn ? '#38bdf8' : (isDark ? '#1e293b' : '#e0e7ef'),
-              borderRadius: 8,
-              paddingVertical: 10,
-              alignItems: 'center',
-              marginLeft: 4,
-              borderWidth: prepaymentOn ? 2 : 1,
-              borderColor: prepaymentOn ? '#2563eb' : (isDark ? '#334155' : '#cbd5e1')
-            }}
+            style={{ ...uniformButton(prepaymentOn, isDark), marginLeft: 4, paddingVertical: 10 }}
           >
-            <Text style={{ color: prepaymentOn ? '#111' : (isDark ? '#fff' : '#111'), fontWeight: 'bold' }}>Prepayment: On</Text>
+            <Text style={uniformButtonText(prepaymentOn, isDark)}>Prepayment: On</Text>
           </Pressable>
         </View>
-        {/* DEBUG: Show prepaymentOn state */}
-        <Text style={{ color: '#f87171', marginTop: 4, fontSize: 12 }}>DEBUG: prepaymentOn = {String(prepaymentOn)}</Text>
       </View>
+      {/* Advanced Prepayment Management UI */}
+      {prepaymentOn && (
+        <View style={{ backgroundColor: isDark ? '#0f172a' : '#f1f5f9', borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8 }}>
+          <Text style={{ color: '#fff', fontWeight: 'bold', marginBottom: 4 }}>Advanced Prepayments</Text>
+          {/* List existing prepayments */}
+          {prepayments.length > 0 ? (
+            prepayments.map((pp, idx) => (
+              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                <Text style={{ flex: 1, color: isDark ? '#fff' : '#111', fontSize: 14 }}>
+                  Month: {pp.startMonth || pp.month}, Amount: ₹{pp.amount}, Freq: {pp.frequency || 'one-time'}{pp.penalty ? `, Penalty: ₹${pp.penalty}` : ''}
+                </Text>
+                <Pressable
+                  onPress={() => setPrepayments(prepayments.filter((_, i) => i !== idx))}
+                  style={{ marginLeft: 8, padding: 4, backgroundColor: '#f87171', borderRadius: 6 }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold' }}>Delete</Text>
+                </Pressable>
+              </View>
+            ))
+          ) : (
+            <Text style={{ color: isDark ? '#64748b' : '#64748b', fontSize: 13 }}>No prepayments added yet.</Text>
+          )}
+          {/* Add new prepayment form */}
+          {showAddPrepay ? (
+            <View style={{ marginTop: 8, marginBottom: 4 }}>
+                    <TextInput
+                      value={newPrepayMonth}
+                      onChangeText={setNewPrepayMonth}
+                      keyboardType="numeric"
+                      style={{ backgroundColor: 'transparent', color: isDark ? '#fff' : '#111', borderRadius: 8, padding: 8, marginBottom: 4, fontSize: 14, borderWidth: 1, borderColor: '#cbd5e1' }}
+                      placeholder="Month (e.g., 3)"
+                      placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+                      fontSize={14}
+                    />
+                    <TextInput
+                      value={newPrepayAmt}
+                      onChangeText={setNewPrepayAmt}
+                      keyboardType="numeric"
+                      style={{ backgroundColor: 'transparent', color: isDark ? '#fff' : '#111', borderRadius: 8, padding: 8, marginBottom: 4, fontSize: 14, borderWidth: 1, borderColor: '#cbd5e1' }}
+                      placeholder="Amount (e.g., 100000)"
+                      placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+                      fontSize={14}
+                    />
+                    <TextInput
+                      value={newPrepayPenalty}
+                      onChangeText={setNewPrepayPenalty}
+                      keyboardType="numeric"
+                      style={{ backgroundColor: 'transparent', color: isDark ? '#fff' : '#111', borderRadius: 8, padding: 8, marginBottom: 4, fontSize: 14, borderWidth: 1, borderColor: '#cbd5e1' }}
+                      placeholder="Penalty (optional)"
+                      placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+                      fontSize={14}
+                    />
+              <View style={{ flexDirection: 'row', marginBottom: 4 }}>
+                {['one-time', 'monthly', 'yearly'].map(freq => (
+                   <Pressable
+                     key={freq}
+                     onPress={() => setNewPrepayFreq(freq)}
+                     style={{ ...uniformButton(newPrepayFreq === freq, isDark), flex: undefined, borderRadius: 6, paddingVertical: 6, paddingHorizontal: 12, marginRight: 8, minWidth: 80 }}
+                   >
+                     <Text style={uniformButtonText(newPrepayFreq === freq, isDark)}>{freq.charAt(0).toUpperCase() + freq.slice(1)}</Text>
+                   </Pressable>
+                ))}
+              </View>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <Pressable
+                   onPress={() => {
+                     if (newPrepayMonth && newPrepayAmt) {
+                       setPrepayments([
+                         ...prepayments,
+                         {
+                           startMonth: Number(newPrepayMonth),
+                           amount: Number(newPrepayAmt),
+                           frequency: newPrepayFreq,
+                           penalty: newPrepayPenalty ? Number(newPrepayPenalty) : 0
+                         }
+                       ]);
+                       setNewPrepayMonth("");
+                       setNewPrepayAmt("");
+                       setNewPrepayPenalty("");
+                       setNewPrepayFreq("one-time");
+                       setShowAddPrepay(false);
+                     }
+                   }}
+                   style={{ ...uniformButton(true, isDark), flex: undefined, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16, minWidth: 80 }}
+                 >
+                   <Text style={uniformButtonText(true, isDark)}>Add</Text>
+                </Pressable>
+                <Pressable
+                   onPress={() => {
+                     setShowAddPrepay(false);
+                     setNewPrepayMonth("");
+                     setNewPrepayAmt("");
+                     setNewPrepayPenalty("");
+                     setNewPrepayFreq("one-time");
+                   }}
+                   style={{ ...uniformButton(false, isDark), flex: undefined, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16, minWidth: 80 }}
+                 >
+                   <Text style={uniformButtonText(false, isDark)}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => setShowAddPrepay(true)}
+              style={{ ...uniformButton(true, isDark), flex: undefined, borderRadius: 6, paddingVertical: 8, paddingHorizontal: 16, marginTop: 8, minWidth: 120 }}
+            >
+              <Text style={uniformButtonText(true, isDark)}>Add Prepayment</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
       <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", fontSize: 20 }}>EMI Calculator</Text>
       {/* Inputs */}
       <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
         <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Loan Amount (INR)</Text>
-        <TextInput value={loanAmount} onChangeText={setLoanAmount} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} placeholder="" />
+        <TextInput
+          value={loanAmount}
+          onChangeText={setLoanAmount}
+          keyboardType="numeric"
+          style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 14, fontWeight: "bold" }}
+          placeholder="e.g., 500000"
+          placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+        />
+        <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginTop: 2 }}>Enter the principal loan amount</Text>
         {!isLoanAmountValid && loanAmount !== "" && (
-          <Text style={{ color: 'red', fontSize: 12 }}>Enter a valid loan amount &gt; 0</Text>
+          <Text style={{ color: 'red', fontSize: 12, marginTop: 2 }}>Enter a valid loan amount &gt; 0</Text>
         )}
       </View>
       <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
         <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Annual Interest (%)</Text>
-        <TextInput value={interest} onChangeText={setInterest} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} placeholder="" />
+        <TextInput
+          value={interest}
+          onChangeText={setInterest}
+          keyboardType="numeric"
+          style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 14, fontWeight: "bold" }}
+          placeholder="e.g., 8.5"
+          placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+        />
+        <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginTop: 2 }}>Enter the annual interest rate</Text>
         {!isInterestValid && interest !== "" && (
-          <Text style={{ color: 'red', fontSize: 12 }}>Enter a valid interest rate (0 or more)</Text>
+          <Text style={{ color: 'red', fontSize: 12, marginTop: 2 }}>Enter a valid interest rate (0 or more)</Text>
         )}
       </View>
        {/* Years/Months toggle - moved above Tenure input */}
@@ -520,92 +607,86 @@ export default function App() {
          <Pressable onPress={() => setTenureType("months")} style={uniformButton(tenureType === "months", isDark)}>
            <Text style={uniformButtonText(tenureType === "months", isDark)}>Months</Text>
          </Pressable>
+         <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginLeft: 8 }}>
+           Select tenure unit
+         </Text>
        </View>
-       <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
-         <View style={{ minHeight: 88, justifyContent: 'flex-start' }}>
-           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-             <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>
-               {tenureType === "years" ? "Tenure (Years)" : "Tenure (Months)"}
-             </Text>
-             {!isTenureValid && tenure !== "" && (
-               <Text style={{ color: 'red', marginLeft: 8, fontSize: 12 }}>
-                 {tenureType === "years"
-                   ? "Enter a valid tenure (1-200 years)"
-                   : "Enter a valid tenure (1-2400 months)"}
-               </Text>
-             )}
-           </View>
-           <View style={{ flex: 1, justifyContent: 'center' }}>
-             <TextInput
-               value={tenure}
-               onChangeText={text => {
-                 // Allow only numbers and max 3 digits
-                 const sanitized = text.replace(/[^0-9]/g, '').slice(0, 4);
-                 setTenure(sanitized);
-               }}
-               keyboardType="numeric"
-               maxLength={4}
-               style={{
-                 backgroundColor: 'transparent',
-                 color: isDark ? "#fff" : "#111",
-                 borderRadius: 8,
-                 padding: 12,
-                 fontSize: 18,
-                 fontWeight: "bold"
-               }}
-               placeholder=""
-             />
-           </View>
-         </View>
-       </View>
+        <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>
+          {tenureType === "years" ? "Tenure (Years)" : "Tenure (Months)"}
+        </Text>
+        <TextInput
+          value={tenure}
+          onChangeText={text => {
+            // Allow only numbers and max 3 digits
+            const sanitized = text.replace(/[^0-9]/g, '').slice(0, 4);
+            setTenure(sanitized);
+          }}
+          keyboardType="numeric"
+          maxLength={4}
+          style={{
+            backgroundColor: 'transparent',
+            color: isDark ? "#fff" : "#111",
+            borderRadius: 8,
+            padding: 12,
+            marginTop: 4,
+            fontSize: 14,
+            fontWeight: "bold"
+          }}
+          placeholder={tenureType === "years" ? "e.g., 20" : "e.g., 240"}
+          placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+        />
+        <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginTop: 2 }}>
+          Enter the loan tenure in {tenureType}
+        </Text>
+        {!isTenureValid && tenure !== "" && (
+          <Text style={{ color: 'red', fontSize: 12, marginTop: 2 }}>
+            {tenureType === "years"
+              ? "Enter a valid tenure (1-200 years)"
+              : "Enter a valid tenure (1-2400 months)"}
+          </Text>
+        )}
+      </View>
       <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
         <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Processing Fee (%)</Text>
-        <TextInput value={fee} onChangeText={setFee} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} placeholder="" />
+        <TextInput
+          value={fee}
+          onChangeText={setFee}
+          keyboardType="numeric"
+          style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 14, fontWeight: "bold" }}
+          placeholder="e.g., 1.5"
+          placeholderTextColor={isDark ? '#64748b' : '#94a3b8'}
+        />
+        <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginTop: 2 }}>Enter the processing fee percentage (if any)</Text>
       </View>
-      {/* Show prepayment fields only if prepaymentOn is true */}
-      {prepaymentOn && (
-        <>
-          <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
-            <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>One-time Prepayment Month</Text>
-            <Text style={{ color: isDark ? "#38bdf8" : "#2563eb", fontSize: 13, marginTop: 2, marginBottom: 2 }}>
-              add a month number when you plan to make an extra payment [eg., 3. it means you’ll make the extra payment in March (3rd month)]
-            </Text>
-            <TextInput value={prepayMonth} onChangeText={setPrepayMonth} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} placeholder="" />
-          </View>
-          <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
-            <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>One-time Prepayment Amount (INR)</Text>
-            <TextInput value={prepayAmt} onChangeText={setPrepayAmt} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} placeholder="" />
-          </View>
-        </>
-      )}
-       {/* ...existing code... */}
-      {/* EMI Results - only show if all required fields are valid */}
+       {/* Prepayment fields below processing fee are now always hidden for clarity and consistency. */}
+       {/* EMI Results - only show if all required fields are valid */}
       {allRequiredValid && (
         <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 12, padding: 12, marginVertical: 8 }}>
           <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", marginBottom: 4, fontSize: 16 }}>Monthly EMI</Text>
           {/* Displayed EMI is rounded for clarity */}
-          <Text style={{ color: "#38bdf8", fontWeight: "bold", fontSize: 18, marginBottom: 6 }}>₹{emi.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+          <Text style={{ color: "#38bdf8", fontWeight: "bold", fontSize: 18, marginBottom: 6 }}>₹{(typeof emi === 'number' && !isNaN(emi) ? emi : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Loan Tenure</Text>
-            <Text style={{ color: isDark ? "#fff" : "#111" }}>{n} months</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111" }}>{typeof n === 'number' && !isNaN(n) ? n : 0} months</Text>
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Total Interest</Text>
-            <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{(emiUnrounded * n - P).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{(typeof emiUnrounded === 'number' && typeof n === 'number' && !isNaN(emiUnrounded) && !isNaN(n) ? emiUnrounded * n - (parseFloat(loanAmount) || 0) : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Total Repayment</Text>
-            <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{(emiUnrounded * n).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{(typeof emiUnrounded === 'number' && typeof n === 'number' && !isNaN(emiUnrounded) && !isNaN(n) ? emiUnrounded * n : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
             <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Processing Fee</Text>
-            <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{procFee.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{(typeof procFee === 'number' && !isNaN(procFee) ? procFee : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 4 }}>
             <Text style={{ color: "#22d3ee", fontWeight: "bold" }}>Total Outflow</Text>
-            <Text style={{ color: "#22d3ee", fontWeight: "bold", fontSize: 16 }}>₹{(emiUnrounded * n + procFee).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: "#22d3ee", fontWeight: "bold", fontSize: 16 }}>₹{(typeof emiUnrounded === 'number' && typeof n === 'number' && typeof procFee === 'number' && !isNaN(emiUnrounded) && !isNaN(n) && !isNaN(procFee) ? emiUnrounded * n + procFee : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
           </View>
-          {(emiUnrounded * n + procFee) > 0 && (
+          {(typeof emiUnrounded === 'number' && typeof n === 'number' && typeof procFee === 'number' && !isNaN(emiUnrounded) && !isNaN(n) && !isNaN(procFee) && (emiUnrounded * n + procFee) > 0) && (
             <Text style={{ color: "#22d3ee", fontStyle: "italic", marginTop: 2, fontSize: 13 }}>
               {amountInWords(emiUnrounded * n + procFee)}
             </Text>
@@ -620,19 +701,19 @@ export default function App() {
             <>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Prepayment Applied</Text>
-                <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{prepay.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                <Text style={{ color: isDark ? "#fff" : "#111" }}>₹{(typeof prepay === 'number' && !isNaN(prepay) ? prepay : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
               </View>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>New Tenure</Text>
-                <Text style={{ color: isDark ? "#fff" : "#111" }}>{Math.round(newN)} months</Text>
+                <Text style={{ color: isDark ? "#fff" : "#111" }}>{typeof newN === 'number' && !isNaN(newN) ? Math.round(newN) : 0} months</Text>
               </View>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Tenure Saved</Text>
-                <Text style={{ color: isDark ? "#fff" : "#111" }}>{Math.round(n - newN)} months</Text>
+                <Text style={{ color: isDark ? "#fff" : "#111" }}>{typeof n === 'number' && typeof newN === 'number' && !isNaN(n) && !isNaN(newN) ? Math.round(n - newN) : 0} months</Text>
               </View>
               <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                 <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Interest Saved</Text>
-                <Text style={{ color: "#38bdf8", fontWeight: "bold" }}>₹{interestSaved.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+                <Text style={{ color: "#38bdf8", fontWeight: "bold" }}>₹{(typeof interestSaved === 'number' && !isNaN(interestSaved) ? interestSaved : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
               </View>
             </>
           ) : (
@@ -672,11 +753,11 @@ export default function App() {
         </View>
         {amort.map((row, idx) => (
           <View key={idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-            <Text style={{ color: isDark ? "#fff" : "#111", width: 60 }}>M{row.m}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", width: 60 }}>M{row?.month ?? idx + 1}</Text>
             {/* Show EMI as rounded for display in amortization table */}
-            <Text style={{ color: isDark ? "#fff" : "#111", width: 80 }}>₹{(Math.round(row.emi * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
-            <Text style={{ color: isDark ? "#fff" : "#111", width: 60 }}>₹{row.int.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
-            <Text style={{ color: isDark ? "#fff" : "#111", width: 80 }}>₹{row.bal.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", width: 80 }}>₹{(typeof row?.emi === 'number' && !isNaN(row.emi) ? Math.round(row.emi * 100) / 100 : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", width: 60 }}>₹{(typeof row?.interest === 'number' && !isNaN(row.interest) ? row.interest : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#fff" : "#111", width: 80 }}>₹{(typeof row?.closingPrincipal === 'number' && !isNaN(row.closingPrincipal) ? row.closingPrincipal : 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
           </View>
         ))}
       </View>
@@ -747,32 +828,35 @@ function TaxEstimatorCard({ isDark }) {
 
   return (
     <View style={{ backgroundColor: isDark ? "#1e293b" : "#fff", borderRadius: 16, margin: 24, marginTop: 0, padding: 16, borderWidth: 1, borderColor: isDark ? "#2563eb33" : "#a5b4fc", shadowColor: "#000", shadowOpacity: 0.08, shadowRadius: 8 }}>
-      <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", fontSize: 20 }}>Tax Estimator</Text>
+      <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", fontSize: 20, marginBottom: 8 }}>Tax Estimator</Text>
       {/* Inputs */}
-      <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 8 }}>Total Income (INR)</Text>
-      <TextInput value={income} onChangeText={setIncome} keyboardType="numeric" style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
-      {!isIncomeValid && income !== "" && (
-        <Text style={{ color: 'red', fontSize: 12 }}>Enter a valid income &gt; 0</Text>
-      )}
-      <Text style={{ color: isDark ? "#cbd5e1" : "#334155", marginTop: 8 }}>Deductions (Only NPS employer contribution allowed in New Regime)</Text>
-      <TextInput
-        value={deductions}
-        onChangeText={text => {
-          // Allow only numbers and commas
-          const sanitized = text.replace(/[^0-9,]/g, '');
-          setDeductions(sanitized);
-        }}
-        style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 14, fontWeight: "bold" }}
-        placeholder="Enter NPS deduction (eg., 50000)"
-        placeholderTextColor={isDark ? "#64748b" : "#94a3b8"}
-      />
-      {!deductionsValid && deductions !== "" && (
-        <Text style={{ color: 'red', fontSize: 12 }}>Enter valid deduction(s) (comma-separated, each ≥ 0)</Text>
-      )}
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Total Income (INR)</Text>
+        <TextInput value={income} onChangeText={setIncome} keyboardType="numeric" style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 18, fontWeight: "bold" }} />
+        <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginTop: 2 }}>Enter your total taxable income</Text>
+        {!isIncomeValid && income !== "" && (
+          <Text style={{ color: 'red', fontSize: 12 }}>Enter a valid income &gt; 0</Text>
+        )}
+      </View>
+      <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 8, padding: 8, marginTop: 8, marginBottom: 8, minHeight: 60 }}>
+        <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Deductions (Only NPS employer contribution allowed in New Regime)</Text>
+        <TextInput
+          value={deductions}
+          onChangeText={text => {
+            // Allow only numbers and commas
+            const sanitized = text.replace(/[^0-9,]/g, '');
+            setDeductions(sanitized);
+          }}
+          style={{ backgroundColor: 'transparent', color: isDark ? "#fff" : "#111", borderRadius: 8, padding: 12, marginTop: 4, fontSize: 14, fontWeight: "bold" }}
+        />
+        <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontSize: 13, marginTop: 2 }}>Enter eligible deductions (comma-separated, e.g., 50000,20000)</Text>
+        {!deductionsValid && deductions !== "" && (
+          <Text style={{ color: 'red', fontSize: 12 }}>Enter valid deduction(s) (comma-separated, each ≥ 0)</Text>
+        )}
+      </View>
       {/* Results section - only show if all required fields are valid */}
       {allTaxValid && (
-        <View style={{ gap: 16, marginTop: 16 }}>
-          {/* Main scenario results (tax only) */}
+        <View style={{ backgroundColor: isDark ? "#0f172a" : "#f1f5f9", borderRadius: 12, padding: 12, marginTop: 16, minHeight: 120 }}>
           <Text style={{ color: isDark ? "#fff" : "#111", fontWeight: "bold", marginBottom: 4, fontSize: 16 }}>Tax Calculation</Text>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
             <Text style={{ color: isDark ? "#cbd5e1" : "#334155" }}>Taxable Income</Text>
@@ -784,7 +868,7 @@ function TaxEstimatorCard({ isDark }) {
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 2, marginTop: 8 }}>
             <Text style={{ color: isDark ? "#cbd5e1" : "#334155", fontSize: 18, fontWeight: "bold" }}>Net Income</Text>
-            <Text style={{ color: isDark ? "#38bdf8" : "#2563eb", fontWeight: "bold", fontSize: 22 }}>₹{netIncome.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
+            <Text style={{ color: isDark ? "#4ade80" : PRIMARY_GREEN, fontWeight: "bold", fontSize: 22 }}>₹{netIncome.toLocaleString(undefined, { maximumFractionDigits: 2 })}</Text>
           </View>
           {/* Net Income in Words removed as per request */}
         </View>
